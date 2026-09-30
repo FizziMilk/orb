@@ -411,13 +411,26 @@ const PAL_PRESETS = {
   'Molten': [[0, 128, 255], [0.25, 160, 255], [0.5, 192, 255], [0.62, 205, 255], [0.72, 250, 255], [0.95, 255, 255], [1.25, 268, 255]],
   'Deep Blue': [[0, 150, 255], [0.35, 168, 255], [0.7, 192, 255], [1, 218, 235], [1.3, 236, 255]],
   'Sunset': [[0, 200, 255], [0.4, 225, 230], [0.8, 245, 255], [1.1, 262, 255], [1.4, 276, 255]],
+  'Ember': [[0, 248, 255], [0.4, 260, 255], [0.8, 274, 255], [1.1, 284, 240], [1.4, 294, 215]],
+  'Neon': [[0, 196, 255], [0.35, 212, 255], [0.7, 226, 255], [1.05, 238, 255], [1.15, 340, 255], [1.5, 352, 255]],
+  'Deep Sea': [[0, 166, 255], [0.45, 124, 255], [0.85, 136, 230], [1.2, 145, 150], [1.5, 150, 90]],
 };
+const fxOn = (off = []) => Object.fromEntries(FX.map(f => [f[0], off.includes(f[0]) ? 0 : 1]));
 const ALL_FX = FX.map(f => f[0]);
 const BUILTIN = {
   'Club Light': { set: { mode: 0, floor: 0, ...Object.fromEntries(ALL_FX.map(k => [k, 1])) }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
-  'Day': { set: { mode: 0, floor: 0.05, ...Object.fromEntries(ALL_FX.map(k => [k, 1])) }, pal: 'Club Light', desc: 'Same, with a floor so it never goes dark.' },
   'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
   'Lamp': { set: { mode: 1 }, pal: null, desc: 'A plain light in one colour.' },
+  'Ember': { set: { mode: 0, floor: 0, ...fxOn(['fx_flood', 'fx_hats', 'fx_party']), coloursmooth: 0.0012, wobble: 0.02, idlehue: 10,
+      col_clap: 2, hue_clap: 30, sat_clap: 60, col_spark: 2, hue_spark: 30, sat_spark: 60, col_spin: 2, hue_spin: 30, sat_spin: 60 },
+    pal: 'Ember', desc: 'Warm and slow: red to gold, white sparks.' },
+  'Neon': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, partyrange: 2, partychance: 0.8, partyhold: 16, idlehue: 200,
+      col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_hat: 1, shift_hat: 128, sat_hat: 200,
+      col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128, sat_spin: 230 },
+    pal: 'Neon', desc: 'Loud: violet and pink, acid green at the peak.' },
+  'Deep Sea': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), idlehue: 150, clapgain: 3.5, sparkgain: 4.5, spingain: 6, ripplegain: 3,
+      col_eye: 2, hue_eye: 4, sat_eye: 190, col_clap: 2, hue_clap: 4, sat_clap: 200, col_spark: 2, hue_spark: 4, sat_spark: 200, col_spin: 2, hue_spin: 4, sat_spin: 190 },
+    pal: 'Deep Sea', desc: 'Cool and moody: navy to ice, coral eye.' },
 };
 
 // ---------------- State ----------------

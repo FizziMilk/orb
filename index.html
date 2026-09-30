@@ -1,4 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orb Control</title>
 <style>
 /* Layout: one column control deck. Sticky header (connection + live strip), tab row, stacked panels of controls.
@@ -136,6 +140,8 @@ select { width: auto; }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 
+</head>
+<body>
 <header>
   <div class="head-row">
     <div class="orb-dot" id="orbDot" aria-hidden="true"></div>
@@ -169,6 +175,11 @@ select { width: auto; }
   <div class="banner" id="noBle" hidden>
     <h3>Bluetooth isn't available here</h3>
     <p class="small muted">This page needs Chrome on Android (or desktop Chrome) opened from an https address. Inside a preview frame Bluetooth is blocked, so you're looking at the demo: every control works against a pretend orb.</p>
+  </div>
+  <div class="banner" id="pinBox" hidden>
+    <h3>Enter the orb's PIN</h3>
+    <p class="small muted" id="pinMsg">The orb only takes commands after its PIN. This phone remembers it.</p>
+    <div class="numrow"><input type="password" inputmode="numeric" id="pinIn" autocomplete="off" aria-label="PIN" style="width:120px"><button class="primary" id="pinGo">Unlock</button></div>
   </div>
   <div class="banner" id="offNote" hidden>
     <p class="small"><b>Not connected.</b> <span class="muted">Changes aren't reaching the orb. Tap Connect.</span></p>
@@ -275,6 +286,11 @@ select { width: auto; }
     <div class="card">
       <h2>Test patterns</h2>
       <div class="btns"><button id="tTurns">Each turn in its own colour</button><button id="tCol">Face column and spots</button><button id="tOff" class="ghost">Back to music</button></div>
+    </div>
+    <div class="card">
+      <h2>PIN</h2>
+      <p class="muted small">Anyone near the orb needs this to control it over Bluetooth. 4 to 8 characters.</p>
+      <div class="numrow"><input type="password" id="newPin" autocomplete="off" aria-label="New PIN" style="width:140px"><button id="setPin">Change PIN</button></div>
     </div>
     <div class="card">
       <h2>Serial log</h2>
@@ -834,10 +850,25 @@ function onLine(line) {
       break;
     }
     case 'loaded': case 'saved': break;
+    case 'pin': if (w[1] === 'ok') { $('pinBox').hidden = true; savePin(pendingPin || loadPin()); pendingPin = null; if (bleDev) $('connState').textContent = 'Connected to ' + (bleDev.name || 'Orb'); requestAll(); }
+                else if (w[1] === 'wrong') showPin('That PIN is wrong. Try again.');
+                else if (w[1] === 'changed') { savePin(newPinPending); toast('PIN changed'); }
+                break;
+    case 'locked': showPin('The orb is locked. Enter its PIN.'); break;
   }
   if (w[0] === 'ok' && (w[1] === 'pload')) { gettingAll = true; }
 }
-let gettingAll = false, demoTimer = null, pendingPal = null;
+let gettingAll = false, demoTimer = null, pendingPal = null, pendingPin = null, newPinPending = null;
+function loadPin() { try { return localStorage.getItem('orbPin') || ''; } catch (e) { return ''; } }
+function savePin(p) { if (!p) return; try { localStorage.setItem('orbPin', p); } catch (e) {} }
+function showPin(msg) { $('pinBox').hidden = false; if (msg) $('pinMsg').textContent = msg; $('pinIn').value = ''; $('pinIn').focus(); }
+$('pinGo').addEventListener('click', () => { const p = $('pinIn').value.trim(); if (!p) return; pendingPin = p; send('pin ' + p); });
+$('pinIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pinGo').click(); });
+$('setPin').addEventListener('click', () => {
+  const p = $('newPin').value.trim();
+  if (p.length < 4 || p.length > 8 || /\s/.test(p)) { toast('Use 4 to 8 characters, no spaces'); return; }
+  newPinPending = p; send('setpin ' + p); $('newPin').value = '';
+});
 function requestAll() { gettingAll = true; send('get'); send('pnames'); }
 
 // ---------------- Bluetooth link (Nordic UART) ----------------
@@ -881,8 +912,9 @@ async function connectBle() {
     link = null; gettingAll = false; $('offNote').hidden = false;
     setConnected(false, 'Disconnected - tap Connect');
   });
-  setConnected(true, 'Connected to ' + (dev.name || 'Orb'));
-  requestAll();
+  setConnected(true, 'Connected to ' + (dev.name || 'Orb') + ' - checking PIN');
+  const saved = loadPin();
+  if (saved) send('pin ' + saved); else showPin('');
 }
 function setConnected(on, msg) {
   $('connState').textContent = msg; $('btnConnect').textContent = on ? 'Reconnect' : 'Connect';
@@ -914,6 +946,7 @@ function startDemo() {
     } else if (w[0] === 'set' && w[1] in st) { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); }
     else if (w[0] === 'defaults') { Object.assign(st, DEMO); link.send('get'); }
     else if (w[0] === 'pnames') reply('pnames|||');
+    else if (w[0] === 'setpin') reply('pin changed');
   } };
   $('demoNote').hidden = false;
   setConnected(false, 'Demo: pretend orb');
@@ -944,4 +977,5 @@ if (!navigator.bluetooth) $('noBle').hidden = false;
 startDemo();
 </script>
 
-</body></html>
+</body>
+</html>

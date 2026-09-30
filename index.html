@@ -137,6 +137,11 @@ select { width: auto; }
 .banner { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--panel); display: grid; gap: 10px; }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; font-size: 0.88rem; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: calc(100% - 32px); }
 .toast.show { opacity: 1; }
+.undo { display: flex; align-items: center; gap: 12px; pointer-events: none; width: max-content; }
+.undo.show { pointer-events: auto; }
+.undo button { flex: none; }
+/* Phones: sliders only move from the knob, and a mostly-vertical drag scrolls the page */
+@media (pointer: coarse) { input[type=range] { pointer-events: none; } .ctl { touch-action: pan-y; } }
 .confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -315,6 +320,7 @@ select { width: auto; }
   </section>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div class="toast undo" id="undoToast" role="status"><span id="undoMsg"></span><button class="small" id="undoBtn" type="button">Undo</button></div>
 
 <script>
 // ---------------- Settings the app knows about (keys match the firmware) ----------------
@@ -471,7 +477,7 @@ function coolness(h) { h = ((h % 256) + 256) % 256; return Math.max(0, Math.min(
 
 // ---------------- UI helpers ----------------
 const $ = (id) => document.getElementById(id);
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
+function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 function send(line) {
@@ -995,6 +1001,65 @@ async function connectBle() {
 function setConnected(on, msg) {
   $('connState').textContent = msg; $('btnConnect').textContent = on ? 'Reconnect' : 'Connect';
   $('btnSave').disabled = !on; $('btnRevert').disabled = !on;
+}
+
+// ---------------- Sliders: knob-only dragging on phones, and undo ----------------
+// Phones: the track ignores touches (CSS above), so scrolling over a slider never changes it. A touch that lands
+// on the knob and moves sideways drags it; a mostly-vertical move is left to the browser as a scroll.
+const KNOB_R = 11, KNOB_GRAB = 28;                         // knob radius and how close a touch must land (px)
+let sliderDrag = null, undoPending = null;
+function rangeValueToX(inp, rect) {
+  const mn = +inp.min, mx = +inp.max, f = mx > mn ? (+inp.value - mn) / (mx - mn) : 0;
+  return rect.left + KNOB_R + f * (rect.width - 2 * KNOB_R);
+}
+function beginUndo(inp) {
+  if (undoPending && undoPending.inp === inp) return;
+  const box = inp.closest('.ctl');
+  undoPending = { inp, val: inp.value, text: box?.querySelector('output')?.textContent.trim() ?? inp.value, label: box?.querySelector('label')?.textContent.trim() ?? 'Setting' };
+}
+function endUndo(inp) {
+  const u = undoPending; undoPending = null;
+  if (!u || u.inp !== inp || inp.value === u.val) return;
+  const now = inp.closest('.ctl')?.querySelector('output')?.textContent.trim() ?? inp.value;
+  $('toast').classList.remove('show');
+  $('undoMsg').textContent = `${u.label}: ${u.text} → ${now}`;
+  const t = $('undoToast'); t.classList.add('show'); clearTimeout(endUndo.h);
+  endUndo.h = setTimeout(() => t.classList.remove('show'), 4000);
+  $('undoBtn').onclick = () => {
+    inp.value = u.val; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+    t.classList.remove('show'); toast(u.label + ' back to ' + u.text);
+  };
+}
+if (matchMedia('(pointer: coarse)').matches) {
+  document.addEventListener('pointerdown', (e) => {
+    const box = e.target.closest && e.target.closest('.ctl'); if (!box) return;
+    const inp = box.querySelector('input[type=range]'); if (!inp || inp.disabled) return;
+    const r = inp.getBoundingClientRect();
+    if (e.clientY < r.top - 12 || e.clientY > r.bottom + 12) return;              // not on the slider line
+    if (Math.abs(e.clientX - rangeValueToX(inp, r)) > KNOB_GRAB) return;            // not on the knob: just a scroll/tap
+    sliderDrag = { inp, id: e.pointerId, x0: e.clientX, v0: +inp.value, r };
+    beginUndo(inp);
+    try { box.setPointerCapture(e.pointerId); } catch (_) {}
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    const d = sliderDrag; if (!d || e.pointerId !== d.id) return;
+    const mn = +d.inp.min, mx = +d.inp.max, st = +d.inp.step || 1;
+    let v = d.v0 + (e.clientX - d.x0) / Math.max(1, d.r.width - 2 * KNOB_R) * (mx - mn);
+    v = Math.min(mx, Math.max(mn, Math.round((v - mn) / st) * st + mn));
+    if (String(+v.toFixed(6)) !== d.inp.value) { d.inp.value = +v.toFixed(6); d.inp.dispatchEvent(new Event('input', { bubbles: true })); }
+  }, true);
+  const stopDrag = (e) => {
+    const d = sliderDrag; if (!d || e.pointerId !== d.id) return;
+    sliderDrag = null; d.inp.dispatchEvent(new Event('change', { bubbles: true }));
+    if (e.type === 'pointercancel') undoPending = null; else endUndo(d.inp);        // cancelled = the browser took it as a scroll
+    if (e.type === 'pointercancel' && d.inp.value !== String(d.v0)) { d.inp.value = d.v0; d.inp.dispatchEvent(new Event('input', { bubbles: true })); }
+  };
+  document.addEventListener('pointerup', stopDrag, true);
+  document.addEventListener('pointercancel', stopDrag, true);
+} else {                                                    // mouse / keyboard: normal sliders, with undo
+  document.addEventListener('pointerdown', (e) => { if (e.target.matches?.('input[type=range]')) beginUndo(e.target); }, true);
+  document.addEventListener('keydown', (e) => { if (e.target.matches?.('input[type=range]')) beginUndo(e.target); }, true);
+  document.addEventListener('change', (e) => { if (e.target.matches?.('input[type=range]')) endUndo(e.target); }, true);
 }
 
 // ---------------- Demo orb (no Bluetooth) ----------------

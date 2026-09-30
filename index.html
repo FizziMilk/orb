@@ -1,0 +1,947 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Orb Control</title>
+<style>
+/* Layout: one column control deck. Sticky header (connection + live strip), tab row, stacked panels of controls.
+   Dark only on purpose: it's used next to a glowing orb in a dim room. Only the orb dot follows the live colour. */
+:root {
+  --bg: #100e15;
+  --panel: #1a1721;
+  --panel-2: #221e2b;
+  --line: #2f2a3b;
+  --fg: #eeeaf5;
+  --muted: #9d95b0;
+  --accent: #e0673f;
+  --orb: #e0673f;             /* only the orb dot follows the orb's live colour */
+  --good: #6fcf97;
+  --warn: #f2b25c;
+  --bad: #ef6a6a;
+  --display: "Unbounded", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font: 15px/1.45 var(--body); margin: 0; padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 760px; margin: 0 auto; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font: 600 1.25rem/1 var(--display); letter-spacing: 0.02em; }
+h2 { font: 600 0.95rem/1.2 var(--display); letter-spacing: 0.03em; }
+h3 { font: 600 0.95rem/1.3 var(--body); }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Header */
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 14px 10px; border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 16px; }
+.head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: 760px; margin: 0 auto; }
+.orb-dot { width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), var(--orb); box-shadow: 0 0 18px var(--orb); flex: none; transition: background .6s, box-shadow .6s; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.live { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; max-width: 760px; margin-inline: auto; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 500 0.8rem/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+.chip b { font-weight: 600; color: var(--fg); }
+.chip.on { border-color: var(--accent); }
+.heat { width: 64px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.heat i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7a5cff, #e0673f); background-size: 64px 100%; background-repeat: no-repeat; transition: width .4s; }  /* shows the palette */
+.sec-calm { color: #8fb3ff; } .sec-build { color: #f2d15c; } .sec-groove { color: #6fcf97; } .sec-drop { color: #ff7a59; } .sec-silent { color: var(--muted); }
+
+/* Buttons */
+button { font: 600 0.88rem/1 var(--body); color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #140f10; }
+button.ghost { background: transparent; }
+button.small { padding: 6px 10px; font-size: 0.8rem; }
+button:disabled { opacity: .45; cursor: default; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Tabs */
+nav { display: flex; gap: 4px; overflow-x: auto; padding-block: 12px 4px; max-width: 760px; margin: 0 auto; scrollbar-width: none; }
+nav button { background: transparent; border: 1px solid transparent; border-radius: 999px; padding: 8px 14px; color: var(--muted); flex: none; }
+nav button[aria-selected="true"] { color: var(--fg); border-color: var(--line); background: var(--panel); }
+
+/* Panels */
+section.tab { display: grid; gap: 14px; padding-top: 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card-head .grow p { margin-top: 2px; }
+.rows { display: grid; gap: 12px; }
+
+/* Slider row */
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.ctl label { font-size: 0.9rem; }
+.ctl output { font: 500 0.85rem var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; min-width: 64px; }
+.ctl input[type=range] { grid-column: 1 / -1; }
+.ctl .hint { grid-column: 1 / -1; font-size: 0.78rem; color: var(--muted); }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; margin: 0; background: transparent; }
+input[type=range].hue { -webkit-appearance: none; appearance: none; height: 14px; border-radius: 7px; margin: 7px 0;
+  background: linear-gradient(90deg, hsl(0 90% 55%), hsl(30 95% 55%), hsl(60 95% 52%), hsl(120 70% 45%), hsl(180 75% 45%), hsl(240 80% 60%), hsl(280 75% 58%), hsl(330 85% 58%), hsl(360 90% 55%)); }
+input[type=range].hue::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--bg); box-shadow: 0 0 0 1px #0006; }
+input[type=range].hue::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 3px solid var(--bg); }
+
+/* Toggles */
+.switch { position: relative; width: 44px; height: 26px; flex: none; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 13px; background: var(--panel-2); border: 1px solid var(--line); transition: background .2s; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform .2s, background .2s; }
+.switch input:checked + span { background: color-mix(in srgb, var(--accent) 45%, var(--panel-2)); border-color: var(--accent); }
+.switch input:checked + span::after { transform: translateX(18px); background: #fff; }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fx-row { display: flex; align-items: center; gap: 12px; padding-block: 6px; border-top: 1px solid var(--line); }
+.fx-row:first-child { border-top: 0; }
+
+/* Segmented */
+.seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 7px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+
+/* Palette */
+.paled { position: relative; padding-block: 0 26px; user-select: none; -webkit-user-select: none; }
+.palbar { height: 44px; border-radius: 10px; border: 1px solid var(--line); position: relative; cursor: copy; touch-action: none; }
+.mark { position: absolute; top: 34px; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; border: 3px solid #fff;
+  box-shadow: 0 0 0 1px #0008, 0 2px 6px #0008; cursor: grab; touch-action: none; z-index: 2; padding: 0; }
+.mark::before { content: ""; position: absolute; left: 50%; top: -11px; width: 2px; height: 9px; margin-left: -1px; background: #fff; }
+.mark.sel { transform: scale(1.18); box-shadow: 0 0 0 2px var(--accent), 0 2px 8px #000a; }
+.mark.drop { opacity: .35; }
+.palscale { position: relative; height: 16px; font: 500 0.7rem var(--mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.palscale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.palscale span:first-child { transform: none; }
+.stop.sel { border-color: var(--accent); }
+.stop { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; background: var(--panel-2); }
+.stop-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.swatch { width: 26px; height: 26px; border-radius: 7px; border: 1px solid #fff3; flex: none; }
+.warnline { font-size: 0.78rem; color: var(--warn); }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); cursor: pointer; min-width: 120px; flex: 1 1 120px; text-align: left; font: inherit; color: inherit; }
+.preset .pbar { height: 10px; border-radius: 5px; }
+
+/* Setup */
+.numrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input[type=number], input[type=text], select { font: 500 0.9rem var(--mono); color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 84px; }
+input[type=text] { width: 100%; font-family: var(--body); }
+select { width: auto; }
+.grid-spots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.spotgrp { display: grid; gap: 6px; }
+.spotgrp .numrow input { width: 64px; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+
+.banner { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--panel); display: grid; gap: 10px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; font-size: 0.88rem; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+
+<header>
+  <div class="head-row">
+    <div class="orb-dot" id="orbDot" aria-hidden="true"></div>
+    <div class="grow">
+      <h1>Orb</h1>
+      <p class="muted small" id="connState">Not connected</p>
+    </div>
+    <button id="btnConnect" class="primary">Connect</button>
+    <button id="btnSave" disabled title="Keep the current settings after a restart">Save to orb</button>
+    <button id="btnRevert" class="ghost" disabled title="Go back to the last saved settings">Undo changes</button>
+  </div>
+  <div class="live" aria-live="polite">
+    <span class="chip"><b id="stBpm">–</b> BPM</span>
+    <span class="chip">section: <b id="stSec" class="sec-silent">–</b></span>
+    <span class="chip">heat: <span class="heat"><i id="stHeat"></i></span></span>
+    <span class="chip" id="stStage">dancer</span>
+    <span class="chip" id="stClap">clap grid</span>
+    <span class="chip" id="stHat">hat grid</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="home" aria-selected="true">Home</button>
+    <button role="tab" data-tab="colours" aria-selected="false">Colours</button>
+    <button role="tab" data-tab="effects" aria-selected="false">Effects</button>
+    <button role="tab" data-tab="feel" aria-selected="false">Feel</button>
+    <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
+  </nav>
+
+  <div class="banner" id="noBle" hidden>
+    <h3>Bluetooth isn't available here</h3>
+    <p class="small muted">This page needs Chrome on Android (or desktop Chrome) opened from an https address. Inside a preview frame Bluetooth is blocked, so you're looking at the demo: every control works against a pretend orb.</p>
+  </div>
+  <div class="banner" id="offNote" hidden>
+    <p class="small"><b>Not connected.</b> <span class="muted">Changes aren't reaching the orb. Tap Connect.</span></p>
+  </div>
+  <div class="banner" id="demoNote" hidden>
+    <p class="small"><b>Demo mode.</b> <span class="muted">You're controlling a pretend orb with the default settings. Connect to use the real one.</span></p>
+  </div>
+
+  <!-- HOME -->
+  <section class="tab" id="tab-home" role="tabpanel">
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Mode</h2><p class="muted small">Music reacts to sound. Lamp is a plain light with no effects.</p></div>
+        <div class="seg" id="modeSeg"><button data-mode="0" aria-pressed="true">Music</button><button data-mode="1" aria-pressed="false">Lamp</button></div></div>
+      <div class="rows" id="lampCtl" hidden></div>
+      <div class="rows" id="homeCtl"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Presets</h2><p class="muted small">Built-in looks reset every setting to the tuned defaults, then apply their look, so they're also a way back if you've changed too much. Your own slots store everything too. Neither touches the Setup calibration.</p></div></div>
+      <div class="presets" id="builtinPresets"></div>
+      <div class="rows" id="userPresets"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Effects on / off</h2><p class="muted small">Try fires an effect now, whatever the music is doing.</p></div></div>
+      <div id="fxList"></div>
+    </div>
+  </section>
+
+  <!-- COLOURS -->
+  <section class="tab" id="tab-colours" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Palette</h2><p class="muted small">The glow moves along this bar: left for quiet, melodic parts, the middle for bass-led parts, the right end for the most intense drops.</p></div></div>
+      <div class="paled" id="palEd"><div class="palbar" id="palBar" role="img" aria-label="Palette"></div></div>
+      <div class="palscale"><span style="left:0">calm</span><span style="left:50%">bass-led</span><span style="left:75%">peak</span></div>
+      <p class="muted small">Tap the bar to add a colour there. Drag a circle to move it, or drag it down off the bar to remove it. Tap a circle to jump to its box.</p>
+      <div class="btns"><button id="btnSweep">Sweep on the orb</button></div>
+      <div class="rows" id="stops"></div>
+      <div class="btns"><button class="primary" id="btnSendPal">Done editing</button><span class="muted small" id="palDirty"></span></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Palette presets</h2><p class="muted small">Starting points that looked good on this orb. Tap one, then adjust.</p></div></div>
+      <div class="presets" id="palPresets"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Background glow</h2><p class="muted small">Holds the whole orb at one colour while the effects keep running, so you can see how they read on it.</p></div>
+        <label class="switch" title="Background glow"><input type="checkbox" id="bgOn"><span></span></label></div>
+      <div class="rows" id="bgCtl"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>How colour moves</h2></div></div>
+      <div class="rows" id="colourCtl"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Party mode</h2><p class="muted small">In long drops the colour holds for a while, then jumps to another palette stop.</p></div></div>
+      <div class="seg" id="partySeg"><button data-v="0">Off</button><button data-v="1">Neighbours</button><button data-v="2">2 stops</button><button data-v="9">Anywhere</button></div>
+      <div class="rows" id="partyCtl"></div>
+    </div>
+  </section>
+
+  <!-- EFFECTS -->
+  <section class="tab" id="tab-effects" role="tabpanel" hidden>
+    <div id="fxCards" style="display:grid;gap:14px"></div>
+  </section>
+
+  <!-- FEEL -->
+  <section class="tab" id="tab-feel" role="tabpanel" hidden>
+    <div class="card"><h2>Bass dips</h2><div class="rows" id="feelDips"></div></div>
+    <div class="card"><h2>Quiet and singing parts</h2><div class="rows" id="feelSing"></div></div>
+    <div class="card"><h2>Glow</h2><div class="rows" id="feelGlow"></div></div>
+  </section>
+
+  <!-- SETUP -->
+  <section class="tab" id="tab-setup" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>LED finder</h2><p class="muted small">Lights one LED white. With neighbours on, it also shows where the orb thinks left, right, up and down are.</p></div></div>
+      <div class="numrow">
+        <button id="fPrev" aria-label="Previous LED">◀</button>
+        <input type="number" id="fLed" min="0" max="58" value="43" aria-label="LED number">
+        <button id="fNext" aria-label="Next LED">▶</button>
+        <label class="numrow small"><span class="switch"><input type="checkbox" id="fNb" checked><span></span></span> neighbours</label>
+        <button id="fStop" class="ghost">Stop test</button>
+      </div>
+      <div class="legend"><span><i style="background:#fff"></i>this LED</span><span><i style="background:#e03030"></i>left</span><span><i style="background:#e0a020"></i>right</span><span><i style="background:#30c030"></i>up</span><span><i style="background:#3050f0"></i>down</span></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Face column</h2><p class="muted small">For each turn of the strip, the LED that faces the room. Halves are fine when the front sits between two LEDs. Tick the turn where the eye rests.</p></div></div>
+      <ol class="muted small" style="margin:0;padding-left:18px;display:grid;gap:4px">
+        <li>Find the LED that faces the room with the finder above.</li>
+        <li>Go one turn up and down from it and find the LED straight above or below. Enter each one here, bottom turn first.</li>
+        <li>Check left and right: if the finder's red LED isn't on the left, flip the direction.</li>
+      </ol>
+      <div class="rows" id="rowsEd"></div>
+      <div class="numrow">
+        <button id="rowAdd" class="small">Add turn</button>
+        <span class="small muted">Higher LED numbers go</span>
+        <div class="seg" id="dirSeg"><button data-v="1">Right</button><button data-v="-1">Left</button></div>
+      </div>
+      <div class="btns"><button class="primary" id="rowsSend">Send face column</button><button id="showCol">Show on the orb</button></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Effect spots</h2><p class="muted small">Which LEDs the clap and hat sparks use. Three each.</p></div></div>
+      <div class="grid-spots" id="spotsEd"></div>
+      <div class="btns"><button class="primary" id="spotsSend">Send spots</button><button id="showSpots">Show on the orb</button></div>
+    </div>
+    <div class="card">
+      <h2>Test patterns</h2>
+      <div class="btns"><button id="tTurns">Each turn in its own colour</button><button id="tCol">Face column and spots</button><button id="tOff" class="ghost">Back to music</button></div>
+    </div>
+    <div class="card">
+      <h2>Serial log</h2>
+      <div class="numrow">
+        <select id="logMode" aria-label="Serial log mode">
+          <option value="7">Features (7)</option><option value="4">Full log (4)</option><option value="5">Kick events (5)</option>
+          <option value="1">Tempo (1)</option><option value="2">Mood (2)</option><option value="3">Power (3)</option><option value="6">Quiet (6)</option><option value="0">Plotter (0)</option>
+        </select>
+        <button id="logSet" class="small">Set</button>
+        <button id="logBurst" class="small">5 s burst</button>
+      </div>
+      <p class="muted small">The log goes to the USB Serial Monitor, not to this page.</p>
+    </div>
+    <div class="card">
+      <h2>Factory settings</h2>
+      <p class="muted small">Puts every setting, the palette and the calibration back to what's in the sketch. Nothing is stored until you press Save to orb.</p>
+      <div class="confirm" id="factoryBox"><button id="factory">Restore factory settings</button></div>
+      <p class="muted small mono" id="ledCount"></p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ---------------- Settings the app knows about (keys match the firmware) ----------------
+const S = (key, label, min, max, step, opts = {}) => ({ key, label, min, max, step, ...opts });
+const secs = (x) => 0.016 / x;                    // per-update smoothing -> rough seconds
+const fromSecs = (s) => 0.016 / s;
+const pct = (v) => Math.round(v * 100) + '%';
+
+const HOME = [
+  S('bright', 'Brightness', 20, 255, 1, { fmt: v => Math.round(v / 2.55) + '%' }),
+  S('headroom', 'Sensitivity', 2, 14, 0.5, { ui: v => 16 - v, back: v => 16 - v, uiMin: 2, uiMax: 14, fmt: v => (16 - v).toFixed(1), hint: 'Higher = the orb gets brighter at lower volumes.' }),
+];
+const LAMP = [
+  S('lamphue', 'Colour', 0, 255, 1, { hue: true }),
+  S('lampsat', 'Saturation', 0, 255, 1),
+  S('lampbright', 'Brightness', 5, 255, 1),
+];
+const FX = [
+  ['fx_dips', 'Bass dips', 'The pulse: the glow dips with the bass.', null],
+  ['fx_sing', 'Singing brightness', 'Calm parts breathe with the melody.', null],
+  ['fx_singer', 'Singer (voice tracking)', 'The eye follows the vocal up and down.', null],
+  ['fx_flood', 'Big vocal flood', 'Rare: a loud held vocal swells the eye.', 'flood'],
+  ['fx_dancer', 'Dancer', 'Now and then the eye head-bangs in drops.', 'stage'],
+  ['fx_claps', 'Clap sparks', 'Top left and right on the backbeat.', 'clap'],
+  ['fx_hats', 'Hat sparks', 'Bottom sides on off-beat hi-hats.', 'hat'],
+  ['fx_roll', 'Snare-roll flutter', 'Flashes with snare rolls in build-ups.', 'roll'],
+  ['fx_sparkles', 'Drop sparkles', 'Busy drums in drops bubble.', 'sparkle'],
+  ['fx_spin', 'Drop-end spin', 'A bright side sweeps round as a drop ends.', 'spin'],
+  ['fx_ripple', 'Drop ripple', 'A wave climbs the orb when the drop lands.', 'ripple'],
+  ['fx_sling', 'Drop slingshot', 'The colour overshoots warmer on the drop.', null],
+  ['fx_party', 'Party mode', 'Long drops change colour every so often.', 'party'],
+];
+const COLOUR = [
+  S('moodscale', 'How far bass moves the colour', 0.2, 1.5, 0.05, { fmt: v => v.toFixed(2) }),
+  S('coloursmooth', 'Colour follows the music over', 1, 30, 0.5, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(1) + ' s', hint: 'Longer = the colour holds steadier.' }),
+  S('warmth', 'How much drops warm the colour', 0, 1.2, 0.05, { fmt: v => v.toFixed(2) }),
+  S('warmin', 'Drops warm up over', 0.3, 8, 0.1, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(1) + ' s' }),
+  S('warmout', 'Then cool down over', 2, 50, 0.5, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(0) + ' s' }),
+  S('pastel', 'Build-up pastel fade', 0, 200, 5, { fmt: v => Math.round(v / 2) + '%' }),
+  S('wobble', 'Slow drift', 0, 0.15, 0.005, { fmt: v => v.toFixed(3) }),
+  S('accent', 'Accent colour (auto)', -80, 80, 1, { accent: true, hint: 'Claps and the spin on Auto use the glow colour shifted this far. Each effect can also get its own colour on the Effects tab.' }),
+  S('idlehue', 'Idle breathing colour', -1, 255, 1, { hue: true, hint: 'Shown after a few seconds of silence. Far left keeps the last colour.' }),
+];
+const PARTY = [
+  S('partychance', 'Chance per drop', 0, 1, 0.05, { fmt: pct }),
+  S('partyhold', 'Each colour holds', 8, 128, 8, { fmt: v => v + ' beats' }),
+];
+const FX_CARDS = [
+  { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the dancer and the flood.', toggle: 'fx_singer', col: 'eye', autoDesc: 'white, or a contrasting colour on blue / purple', items: [
+    S('eyesing', 'Brightness', 10, 150, 1), S('pitch', 'Up / down range', 0, 1.5, 0.05, { fmt: v => v.toFixed(2) + ' turns' }),
+    S('sidemax', 'Sideways lean', 0, 2, 0.1, { fmt: v => v.toFixed(1) + ' LEDs' }), S('open', 'Opens with the voice', 0, 2, 0.05, { fmt: v => v.toFixed(2) }),
+    S('spring', 'Snappiness', 20, 1000, 10, { hint: 'Low = floaty, high = sharp.' }) ] },
+  { title: 'Big vocal flood', sub: 'Rare: a loud held vocal line swells the eye. Colour: see Singer.', toggle: 'fx_flood', trig: 'flood', items: [ S('floodbright', 'Flood brightness', 40, 255, 1) ] },
+  { title: 'Dancer', sub: 'The eye head-bangs to the beat in drops and grooves. Colour: see Singer.', toggle: 'fx_dancer', trig: 'stage', items: [
+    S('chance', 'Chance per drop', 0, 1, 0.05, { fmt: pct }), S('eyebang', 'Brightness', 10, 150, 1),
+    S('bop', 'Nod size', 0, 10, 0.5), S('springlo', 'Snappiness when warm', 20, 1000, 10), S('springhi', 'Snappiness when hot', 20, 1000, 10),
+    S('swaylo', 'Sway when warm', 0, 2, 0.1), S('swayhi', 'Sway when hot', 0, 2, 0.1),
+    S('fadeout', 'Fade-out when leaving', 0.5, 16, 0.5, { fmt: v => v + ' beats' }) ] },
+  { title: 'Eye contrast', sub: 'Shared by the singer and the dancer.', items: [
+    S('cap', 'Glow limit behind the eye', 20, 255, 1, { hint: 'Lower = the eye stands out more, the rest of the orb dims.' }),
+    S('coolgain', 'Extra brightness on blue / purple', 0.5, 6, 0.1, { fmt: v => '×' + v.toFixed(1) }) ] },
+  { title: 'Clap sparks', sub: 'Top left and right, on the backbeat once the clap grid locks.', toggle: 'fx_claps', trig: 'clap', col: 'clap', autoDesc: "the glow colour's neighbour (accent)", items: [
+    S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }), S('clapdb', 'Lock sensitivity', 0.5, 8, 0.5, { fmt: v => v + ' dB', hint: 'Lower = locks onto claps more easily.' }) ] },
+  { title: 'Hat sparks', sub: 'Bottom sides, on the off-beats once the hat grid locks.', toggle: 'fx_hats', trig: 'hat', col: 'hat', autoDesc: 'warm white', items: [
+    S('hats', 'Sparks per side', 1, 3, 1), S('hatgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
+    S('hatdb', 'Lock sensitivity', 0.5, 6, 0.5, { fmt: v => v + ' dB', hint: 'Lower = locks onto hats more easily.' }) ] },
+  { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [ S('roll', 'Strength', 0, 1.5, 0.05, { fmt: pct }) ] },
+  { title: 'Drop sparkles', sub: 'Busy drums in drops.', toggle: 'fx_sparkles', trig: 'sparkle', col: 'spark', autoDesc: 'the glow colour, a little warmer and richer', items: [
+    S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }), S('sparkbusy', 'Drums needed', 0.5, 3, 0.1, { fmt: v => v.toFixed(1) + ' hits/beat' }) ] },
+  { title: 'Drop-end spin', sub: 'A bright side sweeps round as a drop ends.', toggle: 'fx_spin', trig: 'spin', col: 'spin', autoDesc: 'near-white on warm colours, the accent on blue / purple', items: [
+    S('spinbeats', 'Duration', 0.5, 16, 0.5, { fmt: v => v + ' beats' }), S('spinturns', 'Turns', 0.25, 8, 0.25),
+    S('spingain', 'Brightness', 1, 16, 0.5, { fmt: v => '×' + v }), S('spindim', 'Dims the rest', 0, 1, 0.05, { fmt: pct }) ] },
+  { title: 'Drop ripple and slingshot', sub: 'When the drop lands.', toggle: 'fx_ripple', trig: 'ripple', col: 'ripple', autoDesc: 'a brighter glow colour', items: [
+    S('ripplegain', 'Ripple brightness', 0, 10, 0.5, { fmt: v => '×' + v }), S('sling', 'Slingshot colour push', 0, 0.6, 0.05, { fmt: v => v.toFixed(2) }) ] },
+];
+const FEEL_DIPS = [
+  S('dipdepth', 'Dip depth', 0, 0.95, 0.05, { fmt: pct }),
+  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms' }),
+  S('kickdb', 'Kick sensitivity', 3, 12, 0.5, { ui: v => 15 - v, back: v => 15 - v, uiMin: 3, uiMax: 12, fmt: v => (15 - v).toFixed(1), hint: 'Higher = quieter kicks count.' }),
+];
+const FEEL_SING = [
+  S('singmin', 'Singing: quietest point', 0, 1, 0.05, { fmt: pct }),
+  S('singceil', 'Singing: brightest point', 0.2, 1, 0.05, { fmt: pct, hint: 'Keeps calm parts below the drops.' }),
+  S('singdrift', 'Melody colour drift', 0, 0.3, 0.01, { fmt: v => v.toFixed(2) }),
+  S('floor', 'Always-on floor', 0, 0.3, 0.01, { fmt: pct, hint: 'Minimum light while music plays. 0 lets quiet parts go dark.' }),
+  S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { fmt: pct }),
+];
+const FEEL_GLOW = [
+  S('sparse', 'Dim-glow smoothing', 0, 6, 1, { fmt: v => v < 2 ? 'off' : 'every ' + v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' LED', hint: 'At low light only every few LEDs carry it: smoother, less flicker.' }),
+  S('ledma', 'Total power', 150, 750, 10, { fmt: v => v + ' mA', hint: 'For the LEDs. Capped at 750 mA: the board carries about 1 A and the ESP32 uses the rest.' }),
+  S('fxshare', 'Kept for effects', 0.1, 0.7, 0.01, { fmt: v => Math.round(v * 100) + '% · glow gets ' + Math.round((vals.ledma || 480) * (1 - v)) + ' mA', hint: 'The glow can never use this share, so effects always have room to show in loud parts.' }),
+];
+
+const PAL_PRESETS = {
+  'Club Light': [[0, 128, 255], [0.25, 160, 255], [0.37, 175, 255], [0.5, 192, 255], [0.75, 200, 255], [0.85, 232, 140], [1, 258, 215], [1.25, 276, 255], [1.5, 264, 255]],
+  'Molten': [[0, 128, 255], [0.25, 160, 255], [0.5, 192, 255], [0.62, 205, 255], [0.72, 250, 255], [0.95, 255, 255], [1.25, 268, 255]],
+  'Deep Blue': [[0, 150, 255], [0.35, 168, 255], [0.7, 192, 255], [1, 218, 235], [1.3, 236, 255]],
+  'Sunset': [[0, 200, 255], [0.4, 225, 230], [0.8, 245, 255], [1.1, 262, 255], [1.4, 276, 255]],
+};
+const ALL_FX = FX.map(f => f[0]);
+const BUILTIN = {
+  'Club Light': { set: { mode: 0, floor: 0, ...Object.fromEntries(ALL_FX.map(k => [k, 1])) }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
+  'Day': { set: { mode: 0, floor: 0.05, ...Object.fromEntries(ALL_FX.map(k => [k, 1])) }, pal: 'Club Light', desc: 'Same, with a floor so it never goes dark.' },
+  'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
+  'Lamp': { set: { mode: 1 }, pal: null, desc: 'A plain light in one colour.' },
+};
+
+// ---------------- State ----------------
+const vals = {};               // key -> number (from the orb)
+let pal = [];                  // [[pos, hue, sat], ...]
+let rows = { n: 4, center: 2, dir: 1, r: [12.5, 28, 43, 57] };
+let spots = [53, 54, 55, 45, 46, 47, 6, 7, 8, 17, 18, 19];
+let ledCount = 59;
+let link = null;               // { send(line) }
+let palDirty = false;
+
+// FastLED hue (0-255) -> CSS colour, roughly as the strip shows it
+function fastHueDeg(h) {
+  h = ((h % 256) + 256) % 256;
+  const pts = [[0, 0], [32, 30], [64, 58], [96, 120], [128, 180], [160, 235], [192, 275], [224, 325], [256, 360]];
+  for (let i = 1; i < pts.length; i++) if (h <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return a[1] + (h - a[0]) / (b[0] - a[0]) * (b[1] - a[1]); }
+  return 0;
+}
+function css(h, s = 255, bright = 1) { const sat = s / 255; return `hsl(${fastHueDeg(h).toFixed(0)} ${(55 + 40 * sat).toFixed(0)}% ${(50 + (1 - sat) * 38) * bright}%)`; }
+function coolness(h) { h = ((h % 256) + 256) % 256; return Math.max(0, Math.min(1, (h - 120) / 20)) * Math.max(0, Math.min(1, (225 - h) / 15)); }
+
+// ---------------- UI helpers ----------------
+const $ = (id) => document.getElementById(id);
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
+const sendTimers = {};
+function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
+function send(line) {
+  if (line === 'tool off' || /^tool (find|nb|turns|column|stop|sweep)/.test(line)) { const b = document.getElementById('bgOn'); if (b) b.checked = false; }
+  if (link) link.send(line);
+}
+
+function slider(def) {
+  const box = document.createElement('div'); box.className = 'ctl';
+  const id = 'c_' + def.key;
+  const hasUi = !!def.ui;
+  const min = hasUi ? (def.uiMin ?? def.min) : def.min, max = hasUi ? (def.uiMax ?? def.max) : def.max;
+  box.innerHTML = `<label for="${id}">${def.label}</label><output id="${id}_o"></output><input type="range" id="${id}" min="${min}" max="${max}" step="${def.step}">` + (def.hint ? `<div class="hint">${def.hint}</div>` : '');
+  const inp = box.querySelector('input'), out = box.querySelector('output');
+  if (def.hue) inp.classList.add('hue');
+  def.el = inp;
+  def.render = () => {
+    const v = vals[def.key]; if (v === undefined) return;
+    inp.value = hasUi ? def.ui(v) : v;
+    out.textContent = def.fmt ? def.fmt(v) : (Number.isInteger(def.step) ? Math.round(v) : (+v).toFixed(2));
+    if (def.hue) out.innerHTML = v < 0 && def.key === 'idlehue' ? 'keep last' : `<span class="swatch" style="display:inline-block;width:14px;height:14px;vertical-align:-2px;background:${css(v)}"></span> ${Math.round(v)}`;
+    if (def.accent) { const g = currentHue; out.innerHTML = `<span class="swatch" style="display:inline-block;width:14px;height:14px;vertical-align:-2px;background:${css(g + v)}"></span> ${v > 0 ? '+' : ''}${v}`; }
+  };
+  inp.addEventListener('input', () => {
+    let v = +inp.value; if (hasUi) v = def.back(v);
+    vals[def.key] = v; def.render();
+    if (def.key === 'ledma') controls.forEach(c => c.key === 'fxshare' && c.render());
+    sendSoon(`set ${def.key} ${+v.toFixed(5)}`, def.key);
+    if (def.key.startsWith('lamp') && vals.mode == 1) updateOrbDot(vals.lamphue);
+  });
+  controls.push(def);
+  return box;
+}
+function toggle(key, label, desc, trig) {
+  const row = document.createElement('div'); row.className = 'fx-row';
+  row.innerHTML = `<label class="switch"><input type="checkbox" id="t_${key}" aria-label="${label}"><span></span></label>
+    <div class="grow"><h3>${label}</h3><p class="muted small">${desc}</p></div>` + (trig ? `<button class="small" data-trig="${trig}">Try</button>` : '');
+  const cb = row.querySelector('input');
+  cb.addEventListener('change', () => { vals[key] = cb.checked ? 1 : 0; send(`set ${key} ${vals[key]}`); renderAll(); });
+  toggles.push({ key, cb });
+  return row;
+}
+const controls = [], toggles = [];
+function renderAll() {
+  controls.forEach(c => c.render());
+  toggles.forEach(t => t.cb.checked = vals[t.key] == 1);
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === +(vals.mode ?? 0))));
+  $('lampCtl').hidden = vals.mode != 1;
+  document.querySelectorAll('#partySeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === +(vals.partyrange ?? 1) || (+b.dataset.v === 9 && vals.partyrange >= 3))));
+  document.querySelectorAll('#dirSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === rows.dir)));
+  colourRows.forEach(renderColourRow);
+  $('ledCount').textContent = `Strip: ${ledCount} LEDs (set in the sketch)`;
+  $('fLed').max = ledCount - 1;
+  renderPalette(); renderRows(); renderSpots();
+}
+
+// Effect colour: Auto / Shift / Fixed, with a live swatch on the current glow colour
+const colourRows = [];
+function colourRow(e, autoDesc) {
+  const box = document.createElement('div'); box.className = 'rows'; box.style.borderTop = '1px solid var(--line)'; box.style.paddingTop = '12px';
+  const head = document.createElement('div'); head.className = 'card-head';
+  head.innerHTML = `<div class="grow"><h3>Colour</h3><p class="muted small" data-desc></p></div><span class="swatch" data-sw title="Colour on the current glow"></span>
+    <div class="seg"><button data-m="0">Auto</button><button data-m="1">Shift</button><button data-m="2">Fixed</button></div>`;
+  box.appendChild(head);
+  const sh = slider(S('shift_' + e, 'Shift from the glow colour', -128, 128, 1, { hint: 'Moves round the colour wheel from whatever the glow is showing, so it suits every palette.' }));
+  const hu = slider(S('hue_' + e, 'Colour', 0, 255, 1, { hue: true }));
+  const sa = slider(S('sat_' + e, 'Saturation', 0, 255, 1, { hint: 'Low = towards white.' }));
+  [sh, hu, sa].forEach(x => box.appendChild(x));
+  head.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => { vals['col_' + e] = +b.dataset.m; send(`set col_${e} ${b.dataset.m}`); renderAll(); }));
+  box.addEventListener('input', () => renderColourRow(row));
+  const row = { e, head, sh, hu, sa, autoDesc };
+  colourRows.push(row);
+  return box;
+}
+function renderColourRow(r) {
+  const m = +(vals['col_' + r.e] ?? 0);
+  r.head.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.m === m)));
+  r.sh.hidden = m !== 1; r.hu.hidden = m !== 2; r.sa.hidden = m === 0;
+  r.head.querySelector('[data-desc]').textContent = m === 0 ? 'Auto: ' + r.autoDesc + '.' : m === 1 ? 'Follows the glow, shifted round the wheel.' : 'Always this colour.';
+  const g = currentHue, sat = vals['sat_' + r.e] ?? 255;
+  const sw = r.head.querySelector('[data-sw]');
+  sw.style.background = m === 0 ? 'repeating-linear-gradient(45deg, var(--panel-2) 0 4px, var(--line) 4px 8px)' : m === 1 ? css(g + (vals['shift_' + r.e] ?? 0), sat) : css(vals['hue_' + r.e] ?? 0, sat);
+}
+
+// ---------------- Build the tabs ----------------
+HOME.forEach(d => $('homeCtl').appendChild(slider(d)));
+LAMP.forEach(d => $('lampCtl').appendChild(slider(d)));
+{ const r = toggle('lampbreathe', 'Slow breathing', 'Gently rises and falls instead of a steady light.', null); r.style.borderTop = '0'; $('lampCtl').appendChild(r); }
+FX.forEach(([k, l, d, t]) => $('fxList').appendChild(toggle(k, l, d, t)));
+COLOUR.forEach(d => $('colourCtl').appendChild(slider(d)));
+PARTY.forEach(d => $('partyCtl').appendChild(slider(d)));
+FEEL_DIPS.forEach(d => $('feelDips').appendChild(slider(d)));
+FEEL_SING.forEach(d => $('feelSing').appendChild(slider(d)));
+FEEL_GLOW.forEach(d => $('feelGlow').appendChild(slider(d)));
+FX_CARDS.forEach(c => {
+  const card = document.createElement('div'); card.className = 'card';
+  const head = document.createElement('div'); head.className = 'card-head';
+  head.innerHTML = `<div class="grow"><h2>${c.title}</h2><p class="muted small">${c.sub}</p></div>` + (c.trig ? `<button class="small" data-trig="${c.trig}">Try</button>` : '');
+  if (c.toggle) { const sw = document.createElement('label'); sw.className = 'switch'; sw.title = c.title + ' on/off'; sw.innerHTML = `<input type="checkbox" aria-label="${c.title} on or off"><span></span>`; const cb = sw.querySelector('input'); cb.addEventListener('change', () => { vals[c.toggle] = cb.checked ? 1 : 0; send(`set ${c.toggle} ${vals[c.toggle]}`); renderAll(); }); toggles.push({ key: c.toggle, cb }); head.appendChild(sw); }
+  card.appendChild(head);
+  const rowsEl = document.createElement('div'); rowsEl.className = 'rows';
+  c.items.forEach(d => rowsEl.appendChild(slider(d)));
+  card.appendChild(rowsEl);
+  if (c.col) card.appendChild(colourRow(c.col, c.autoDesc));
+  $('fxCards').appendChild(card);
+});
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-trig]'); if (b) { send('t ' + b.dataset.trig); toast('Fired: ' + b.dataset.trig); } });
+
+// Tabs
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('section.tab').forEach(s => s.hidden = s.id !== 'tab-' + b.dataset.tab);
+  try { localStorage.setItem('orbTab', b.dataset.tab); } catch (e) {}
+}));
+try { const t = localStorage.getItem('orbTab'); if (t) document.querySelector(`nav button[data-tab="${t}"]`)?.click(); } catch (e) {}
+
+// Mode
+document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => { vals.mode = +b.dataset.mode; send('set mode ' + vals.mode); renderAll(); }));
+// Party range
+document.querySelectorAll('#partySeg button').forEach(b => b.addEventListener('click', () => { vals.partyrange = +b.dataset.v; send('set partyrange ' + vals.partyrange); renderAll(); }));
+
+// Presets
+Object.entries(BUILTIN).forEach(([name, p]) => {
+  const b = document.createElement('button'); b.className = 'preset'; b.type = 'button';
+  const palStops = PAL_PRESETS[p.pal] || pal;
+  b.innerHTML = `<span class="pbar" style="background:${name === 'Lamp' ? 'var(--accent)' : gradient(palStops.length ? palStops : PAL_PRESETS['Club Light'])}"></span><b>${name}</b><span class="muted small">${p.desc}</span>`;
+  b.addEventListener('click', () => {
+    gettingAll = true; send('defaults nocal');           // everything back to today's tuning (calibration kept)...
+    Object.entries(p.set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });   // ...then this look
+    if (p.pal) { pal = PAL_PRESETS[p.pal].map(s => [...s]); sendPalette(); pendingPal = p.pal; }
+    renderAll(); toast(name + ' applied - Save to orb to keep it');
+  });
+  $('builtinPresets').appendChild(b);
+});
+let userNames = ['', '', ''];
+function renderUserPresets() {
+  const box = $('userPresets'); box.innerHTML = '';
+  for (let k = 0; k < 3; k++) {
+    const row = document.createElement('div'); row.className = 'numrow';
+    row.innerHTML = `<input type="text" id="pn${k}" placeholder="Slot ${k + 1} (empty)" value="${userNames[k] || ''}" style="flex:1 1 160px;width:auto" aria-label="Name for slot ${k + 1}">
+      <button class="small" data-psave="${k}">Save here</button><button class="small" data-pload="${k}" ${userNames[k] ? '' : 'disabled'}>Load</button>`;
+    box.appendChild(row);
+  }
+}
+renderUserPresets();
+$('userPresets').addEventListener('click', (e) => {
+  const s = e.target.closest('[data-psave]'), l = e.target.closest('[data-pload]');
+  if (s) { const k = +s.dataset.psave; const name = ($('pn' + k).value || 'My preset ' + (k + 1)).replace(/[|\n]/g, ' ').slice(0, 30); send(`psave ${k} ${name}`); userNames[k] = name; renderUserPresets(); toast('Saved to slot ' + (k + 1)); }
+  if (l) { send('pload ' + l.dataset.pload); toast('Loading slot ' + (+l.dataset.pload + 1)); }
+});
+
+// ---------------- Palette ----------------
+function unwrap(stops) {               // hues continue past 255 so the blend goes the short way (red at 255 -> orange 268)
+  const out = []; let prev = null;
+  for (const [p, h, s] of stops) {
+    let x = ((h % 256) + 256) % 256;
+    if (prev !== null) { while (x - prev > 128) x -= 256; while (prev - x > 128) x += 256; }
+    out.push([p, x, s]); prev = x;
+  }
+  return out;
+}
+function gradient(stops) {
+  const u = unwrap(stops); const lo = u[0][0], hi = u[u.length - 1][0] || 1;
+  const parts = [];
+  for (let i = 0; i < u.length; i++) {
+    parts.push(`${css(u[i][1], u[i][2])} ${((u[i][0] - lo) / (hi - lo || 1) * 100).toFixed(1)}%`);
+    if (i < u.length - 1) {               // midpoints, so wraps past red look right
+      const m = [(u[i][0] + u[i + 1][0]) / 2, (u[i][1] + u[i + 1][1]) / 2, (u[i][2] + u[i + 1][2]) / 2];
+      parts.push(`${css(m[1], m[2])} ${((m[0] - lo) / (hi - lo || 1) * 100).toFixed(1)}%`);
+    }
+  }
+  return `linear-gradient(90deg, ${parts.join(', ')})`;
+}
+const PAL_DOMAIN = 2;                                   // bar spans palette positions 0..2
+let palSel = 0;
+function gradientDomain(stops) {                        // the bar: positions to scale, flat before/after the ends
+  const u = unwrap(stops), parts = [];
+  for (let i = 0; i < u.length; i++) {
+    parts.push(`${css(u[i][1], u[i][2])} ${(u[i][0] / PAL_DOMAIN * 100).toFixed(2)}%`);
+    if (i < u.length - 1) { const m = u[i].map((v, k) => (v + u[i + 1][k]) / 2); parts.push(`${css(m[1], m[2])} ${(m[0] / PAL_DOMAIN * 100).toFixed(2)}%`); }
+  }
+  return `linear-gradient(90deg, ${parts.join(', ')})`;
+}
+function colourAt(p) {                                  // the palette's colour at a position (like the orb works it out)
+  const u = unwrap(pal);
+  if (p <= u[0][0]) return [u[0][1], u[0][2]];
+  for (let i = 1; i < u.length; i++) if (p <= u[i][0]) { const t = (p - u[i - 1][0]) / (u[i][0] - u[i - 1][0]); return [u[i - 1][1] + t * (u[i][1] - u[i - 1][1]), u[i - 1][2] + t * (u[i][2] - u[i - 1][2])]; }
+  return [u[u.length - 1][1], u[u.length - 1][2]];
+}
+function drawMarks() {
+  const bar = $('palBar'); bar.style.background = gradientDomain(pal);
+  $('stHeat').style.backgroundImage = gradient(pal);    // heat bar in the palette's own colours
+  $('palEd').querySelectorAll('.mark').forEach(m => m.remove());
+  pal.forEach(([p, h, sat], i) => {
+    const m = document.createElement('button'); m.type = 'button'; m.className = 'mark' + (i === palSel ? ' sel' : '');
+    m.style.left = (p / PAL_DOMAIN * 100) + '%'; m.style.background = css(h, sat); m.dataset.i = i;
+    m.setAttribute('aria-label', `Colour ${i + 1} at ${p.toFixed(2)}`);
+    $('palEd').appendChild(m);
+  });
+}
+function renderPalette() {
+  if (!pal.length) return;
+  palSel = Math.min(palSel, pal.length - 1);
+  drawMarks();
+  const box = $('stops'); box.innerHTML = '';
+  const order = [palSel, ...pal.map((_, i) => i).filter(i => i !== palSel)];   // the selected colour's box comes first
+  order.forEach((i) => {
+    const s = pal[i];
+    const [p, h, sat] = s;
+    const d = document.createElement('div'); d.className = 'stop' + (i === palSel ? ' sel' : ''); d.id = 'stop' + i;
+    const prev = pal[i - 1];
+    const warn = [];
+    if (sat < 140) warn.push('Low saturation washes out towards white on the shell.');
+    if (prev) { const u = unwrap([prev, s]); if (Math.abs(u[1][1] - u[0][1]) > 56) warn.push('Big jump from the colour before: tap the bar in between to add a step.'); }
+    if (i === pal.length - 1 && coolness(h) > 0.5) warn.push('Blue or purple at the top: white effects show less on these colours.');
+    const hMod = ((Math.round(h) % 256) + 256) % 256;
+    d.innerHTML = `<div class="stop-head"><span class="swatch" style="background:${css(h, sat)}"></span><h3 class="grow">Colour ${i + 1} <span class="muted small mono">at ${p.toFixed(2)}</span></h3>
+      <button class="small" data-prev="${i}">Show on the orb</button><button class="small ghost" data-del="${i}" ${pal.length <= 2 ? 'disabled' : ''} aria-label="Remove colour ${i + 1}">Remove</button></div>
+      <div class="ctl"><label for="ph${i}">Colour</label><output class="mono">${hMod}</output><input type="range" class="hue" id="ph${i}" min="0" max="255" step="1" value="${hMod}"></div>
+      <div class="ctl"><label for="ps${i}">Saturation</label><output class="mono">${Math.round(sat)}</output><input type="range" id="ps${i}" min="0" max="255" step="1" value="${Math.round(sat)}"></div>
+      ${warn.map(w => `<div class="warnline">${w}</div>`).join('')}`;
+    box.appendChild(d);
+  });
+  $('palDirty').textContent = palDirty ? 'Already live on the orb. Save to orb keeps it after a restart.' : '';
+}
+function palChanged() { palDirty = true; sendSoon(palLine(), 'pal'); }
+function selectStop(i, scroll) {
+  palSel = i; renderPalette();
+  if (scroll) $('stop' + i)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+$('stops').addEventListener('input', (e) => {
+  const m = e.target.id.match(/^p([hs])(\d+)$/); if (!m) return;
+  const i = +m[2], v = +e.target.value;
+  if (m[1] === 'h') pal[i][1] = v; else pal[i][2] = v;
+  e.target.previousElementSibling.textContent = v;
+  const sw = e.target.closest('.stop').querySelector('.swatch'); sw.style.background = css(pal[i][1], pal[i][2]);
+  if (palSel !== i) { palSel = i; document.querySelectorAll('.stop').forEach(x => x.classList.toggle('sel', x.id === 'stop' + i)); }
+  drawMarks(); palChanged();
+  sendSoon(`tool bg ${((pal[i][1] % 256) + 256) % 256} ${pal[i][2]} 70`, 'palbg');
+});
+$('stops').addEventListener('change', () => { renderPalette(); clearTimeout(sendTimers.bgoff); sendTimers.bgoff = setTimeout(() => { if (!$('bgOn').checked) send('tool off'); }, 3000); });
+$('stops').addEventListener('click', (e) => {
+  const pv = e.target.closest('[data-prev]'), dl = e.target.closest('[data-del]');
+  if (pv) { send(palLine()); send('tool stop ' + pv.dataset.prev + ' 5'); toast('Showing colour ' + (+pv.dataset.prev + 1) + ' for 5 s'); }
+  if (dl) { pal.splice(+dl.dataset.del, 1); palSel = Math.max(0, palSel - 1); palDirty = true; renderPalette(); send(palLine()); }
+});
+// Bar: tap to add, drag circles to move, drag down to remove
+{
+  let drag = null;
+  const posFromX = (x) => { const r = $('palBar').getBoundingClientRect(); return Math.max(0, Math.min(1, (x - r.left) / r.width)) * PAL_DOMAIN; };
+  $('palEd').addEventListener('pointerdown', (e) => {
+    const mk = e.target.closest('.mark');
+    if (mk) {
+      const i = +mk.dataset.i;
+      drag = { i, x0: e.clientX, y0: e.clientY, moved: false, el: mk };
+      mk.setPointerCapture(e.pointerId); palSel = i;
+      document.querySelectorAll('.mark').forEach(x => x.classList.toggle('sel', x === mk));
+      e.preventDefault();
+    } else if (e.target.closest('#palBar')) {
+      if (pal.length >= 12) { toast('12 colours is the most'); return; }
+      const p = +posFromX(e.clientX).toFixed(3);
+      if (pal.some(s => Math.abs(s[0] - p) < 0.03)) return;            // too close to an existing colour
+      const [h, sat] = colourAt(p);
+      let at = pal.findIndex(s => s[0] > p); if (at < 0) at = pal.length;
+      pal.splice(at, 0, [p, ((Math.round(h) % 256) + 256) % 256, Math.round(sat)]);
+      palChanged(); selectStop(at, true);
+      toast('Colour added - adjust it in its box');
+    }
+  });
+  $('palEd').addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    drag.moved = true;
+    const i = drag.i;
+    const lo = i > 0 ? pal[i - 1][0] + 0.02 : 0, hi = i < pal.length - 1 ? pal[i + 1][0] - 0.02 : PAL_DOMAIN;
+    pal[i][0] = +Math.min(hi, Math.max(lo, posFromX(e.clientX))).toFixed(3);
+    drag.el.style.left = (pal[i][0] / PAL_DOMAIN * 100) + '%';
+    drag.el.classList.toggle('drop', dy > 50 && pal.length > 2);
+    $('palBar').style.background = gradientDomain(pal);
+    palChanged();
+  });
+  const end = (e) => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (d.el.classList.contains('drop')) { pal.splice(d.i, 1); palSel = Math.max(0, d.i - 1); palChanged(); renderPalette(); toast('Colour removed'); return; }
+    if (!d.moved) selectStop(d.i, true); else renderPalette();
+  };
+  $('palEd').addEventListener('pointerup', end);
+  $('palEd').addEventListener('pointercancel', end);
+}
+function palLine() {
+  let u = unwrap(pal); const lo = Math.min(...u.map(x => x[1]));
+  if (lo < 0) u = u.map(([p, h, s]) => [p, h + 256, s]);          // keep hues positive (same colours)
+  return 'pal ' + pal.length + ' ' + u.map(([p, h, s]) => `${p.toFixed(3)} ${Math.round(h)} ${Math.round(s)}`).join(' ');
+}
+function sendPalette() { send(palLine()); palDirty = false; renderPalette(); }
+$('btnSendPal').addEventListener('click', () => { clearTimeout(sendTimers.palbg); clearTimeout(sendTimers.pal); sendPalette(); send('tool off'); toast('Palette sent - Save to orb to keep it'); });
+$('btnSweep').addEventListener('click', () => { send(palLine()); send('tool sweep 10'); toast('Sweeping the palette for 10 s'); });
+Object.entries(PAL_PRESETS).forEach(([name, stops]) => {
+  const b = document.createElement('button'); b.className = 'preset'; b.type = 'button';
+  b.innerHTML = `<span class="pbar" style="background:${gradient(stops)}"></span><b>${name}</b>`;
+  b.addEventListener('click', () => { pal = stops.map(s => [...s]); sendPalette(); toast(name + ' palette sent'); });
+  $('palPresets').appendChild(b);
+});
+
+// Background glow tool
+const bg = { h: 192, s: 255, v: 60 };
+[['h', 'Colour', 0, 255, 1, true], ['s', 'Saturation', 0, 255, 1], ['v', 'Brightness', 10, 160, 1]].forEach(([k, l, mn, mx, st, hue]) => {
+  const box = document.createElement('div'); box.className = 'ctl';
+  box.innerHTML = `<label for="bg_${k}">${l}</label><output class="mono">${bg[k]}</output><input type="range" id="bg_${k}" min="${mn}" max="${mx}" step="${st}" value="${bg[k]}" ${hue ? 'class="hue"' : ''}>`;
+  box.querySelector('input').addEventListener('input', (e) => { bg[k] = +e.target.value; box.querySelector('output').textContent = bg[k]; if ($('bgOn').checked) sendSoon(`tool bg ${bg.h} ${bg.s} ${bg.v}`, 'bg'); });
+  $('bgCtl').appendChild(box);
+});
+$('bgOn').addEventListener('change', (e) => send(e.target.checked ? `tool bg ${bg.h} ${bg.s} ${bg.v}` : 'tool off'));
+
+// ---------------- Setup ----------------
+function findLed(n) { n = Math.max(0, Math.min(ledCount - 1, n)); $('fLed').value = n; send('tool find ' + n); }
+$('fPrev').addEventListener('click', () => findLed(+$('fLed').value - 1));
+$('fNext').addEventListener('click', () => findLed(+$('fLed').value + 1));
+$('fLed').addEventListener('change', () => findLed(+$('fLed').value));
+$('fNb').addEventListener('change', (e) => send('tool nb ' + (e.target.checked ? 1 : 0)));
+$('fStop').addEventListener('click', () => send('tool off'));
+function renderRows() {
+  const box = $('rowsEd'); box.innerHTML = '';
+  for (let i = rows.n - 1; i >= 0; i--) {
+    const r = document.createElement('div'); r.className = 'numrow';
+    r.innerHTML = `<span class="small muted" style="width:92px">${i === rows.n - 1 ? 'Top turn' : i === 0 ? 'Bottom turn' : 'Turn ' + (i + 1)}</span>
+      <input type="number" step="0.5" min="0" max="${ledCount - 1}" value="${rows.r[i]}" data-row="${i}" aria-label="Front LED of turn ${i + 1}">
+      <button class="small" data-usef="${i}">Use finder LED</button>
+      <label class="numrow small"><input type="radio" name="centreRow" value="${i}" ${rows.center === i ? 'checked' : ''}> eye rests here</label>
+      ${rows.n > 1 ? `<button class="small ghost" data-rdel="${i}" aria-label="Remove turn ${i + 1}">Remove</button>` : ''}`;
+    box.appendChild(r);
+  }
+}
+$('rowsEd').addEventListener('change', (e) => {
+  if (e.target.dataset.row !== undefined) rows.r[+e.target.dataset.row] = +e.target.value;
+  if (e.target.name === 'centreRow') rows.center = +e.target.value;
+});
+$('rowsEd').addEventListener('click', (e) => {
+  const u = e.target.closest('[data-usef]'), d = e.target.closest('[data-rdel]');
+  if (u) { rows.r[+u.dataset.usef] = +$('fLed').value; renderRows(); }
+  if (d) { const i = +d.dataset.rdel; rows.r.splice(i, 1); rows.n--; if (i < rows.center) rows.center--; rows.center = Math.max(0, Math.min(rows.center, rows.n - 1)); renderRows(); }
+});
+$('rowAdd').addEventListener('click', () => { if (rows.n >= 8) return; rows.r.push(Math.min(ledCount - 1, (rows.r[rows.n - 1] || 0) + 15)); rows.n++; renderRows(); });
+document.querySelectorAll('#dirSeg button').forEach(b => b.addEventListener('click', () => { rows.dir = +b.dataset.v; renderAll(); }));
+function rowsLine() {                                  // bottom to top; the eye stays on the turn you ticked
+  const idx = rows.r.slice(0, rows.n).map((v, i) => i).sort((a, b) => rows.r[a] - rows.r[b]);
+  const centre = idx.indexOf(rows.center);
+  rows.r = idx.map(i => +rows.r[i]); rows.center = Math.max(0, centre); renderRows();
+  return `rows ${rows.n} ${rows.center} ${rows.dir} ${rows.r.join(' ')}`;
+}
+$('rowsSend').addEventListener('click', () => { send(rowsLine()); toast('Face column sent - Save to orb to keep it'); });
+$('showCol').addEventListener('click', () => { send(rowsLine()); send('tool column'); });
+const SPOT_GROUPS = ['Clap spot, left', 'Clap spot, right', 'Hat spot, left', 'Hat spot, right'];
+function renderSpots() {
+  const box = $('spotsEd'); box.innerHTML = '';
+  SPOT_GROUPS.forEach((name, g) => {
+    const d = document.createElement('div'); d.className = 'spotgrp';
+    d.innerHTML = `<span class="small">${name}</span><div class="numrow">` + [0, 1, 2].map(k => `<input type="number" min="0" max="${ledCount - 1}" value="${spots[g * 3 + k]}" data-spot="${g * 3 + k}" aria-label="${name} LED ${k + 1}">`).join('') + '</div>';
+    box.appendChild(d);
+  });
+}
+$('spotsEd').addEventListener('change', (e) => { if (e.target.dataset.spot !== undefined) spots[+e.target.dataset.spot] = Math.round(+e.target.value); });
+$('spotsSend').addEventListener('click', () => { send('spots ' + spots.join(' ')); toast('Spots sent - Save to orb to keep them'); });
+$('showSpots').addEventListener('click', () => { send('spots ' + spots.join(' ')); send('tool column'); });
+$('tTurns').addEventListener('click', () => send('tool turns'));
+$('tCol').addEventListener('click', () => send('tool column'));
+$('tOff').addEventListener('click', () => send('tool off'));
+$('logSet').addEventListener('click', () => send($('logMode').value));
+$('logBurst').addEventListener('click', () => send('b'));
+$('factoryBox').addEventListener('click', (e) => {            // one listener, so it keeps working after re-drawing
+  const box = $('factoryBox'), id = e.target.id;
+  const reset = () => { box.innerHTML = '<button id="factory">Restore factory settings</button>'; };
+  if (id === 'factory') box.innerHTML = '<span class="small">Restore everything?</span><button id="facYes">Yes, restore</button><button id="facNo" class="ghost">Cancel</button>';
+  else if (id === 'facYes') { gettingAll = true; send('defaults'); toast('Factory settings restored (not saved yet)'); reset(); }
+  else if (id === 'facNo') reset();
+});
+
+// Save / revert
+$('btnSave').addEventListener('click', () => { send('save'); toast('Saved on the orb'); });
+$('btnRevert').addEventListener('click', () => { gettingAll = true; send('load'); toast('Back to the last saved settings'); });
+
+// ---------------- Incoming lines ----------------
+let currentHue = 20;
+function updateOrbDot(h, v = 120) { currentHue = h; document.documentElement.style.setProperty('--orb', css(h, 235)); }
+function onLine(line) {
+  const w = line.trim().split(/\s+/);
+  switch (w[0]) {
+    case 'v': vals[w[1]] = +w[2]; if (!gettingAll) renderAll(); break;
+    case 'pal': { const n = +w[1]; pal = []; for (let i = 0; i < n; i++) pal.push([+w[2 + 3 * i], +w[3 + 3 * i], +w[4 + 3 * i]]); palDirty = false; break; }
+    case 'rows': rows = { n: +w[1], center: +w[2], dir: +w[3], r: w.slice(4).map(Number) }; break;
+    case 'spots': spots = w.slice(1).map(Number); break;
+    case 'leds': ledCount = +w[1]; break;
+    case 'end':
+      gettingAll = false;
+      if (pendingPal) { pal = PAL_PRESETS[pendingPal].map(s => [...s]); pendingPal = null; }   // the reset's reply carried the default palette
+      renderAll(); break;
+    case 'pnames': userNames = line.split('|').slice(1); renderUserPresets(); break;
+    case 'S': {
+      const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
+      $('stBpm').textContent = bpm; const se = $('stSec'); se.textContent = sec; se.className = 'sec-' + sec;
+      $('stHeat').style.width = Math.min(100, +heat * 100) + '%';
+      $('stStage').classList.toggle('on', stage === '1'); $('stClap').classList.toggle('on', clap === '1'); $('stHat').classList.toggle('on', hat === '1');
+      updateOrbDot(mode === '1' ? (vals.lamphue ?? 20) : +hue);
+      break;
+    }
+    case 'loaded': case 'saved': break;
+  }
+  if (w[0] === 'ok' && (w[1] === 'pload')) { gettingAll = true; }
+}
+let gettingAll = false, demoTimer = null, pendingPal = null;
+function requestAll() { gettingAll = true; send('get'); send('pnames'); }
+
+// ---------------- Bluetooth link (Nordic UART) ----------------
+const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+let bleDev = null;
+async function connectBle() {
+  const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'Orb' }], optionalServices: [NUS] });
+  if (bleDev && bleDev !== dev && bleDev.gatt.connected) bleDev.gatt.disconnect();
+  bleDev = dev;
+  $('connState').textContent = 'Connecting…';
+  const srv = await dev.gatt.connect();
+  const svc = await srv.getPrimaryService(NUS);
+  const rx = await svc.getCharacteristic(RX), tx = await svc.getCharacteristic(TX);
+  let buf = ''; const dec = new TextDecoder();
+  tx.addEventListener('characteristicvaluechanged', (e) => {
+    buf += dec.decode(e.target.value, { stream: true });              // (letters split across pieces stay whole)
+    let i; while ((i = buf.indexOf('\n')) >= 0) { onLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
+  });
+  await tx.startNotifications();
+  const q = []; let busy = false;
+  const enc = new TextEncoder();
+  async function pump() {
+    if (busy) return; busy = true;
+    while (q.length) {
+      const bytes = enc.encode(q.shift());
+      for (let o = 0; o < bytes.length; o += 20) {
+        try { await rx.writeValueWithoutResponse(bytes.slice(o, o + 20)); }
+        catch (err) {
+          try { await rx.writeValue(bytes.slice(o, o + 20)); }
+          catch (e2) { try { await rx.writeValue(enc.encode('\n')); } catch (e3) {} break; }   // end the broken line
+        }
+      }
+    }
+    busy = false;
+  }
+  const my = { send(line) { q.push(line + '\n'); pump(); } };
+  link = my;
+  clearInterval(demoTimer); $('demoNote').hidden = true; $('offNote').hidden = true;
+  dev.addEventListener('gattserverdisconnected', () => {
+    if (link !== my) return;                                        // an older connection dropping
+    link = null; gettingAll = false; $('offNote').hidden = false;
+    setConnected(false, 'Disconnected - tap Connect');
+  });
+  setConnected(true, 'Connected to ' + (dev.name || 'Orb'));
+  requestAll();
+}
+function setConnected(on, msg) {
+  $('connState').textContent = msg; $('btnConnect').textContent = on ? 'Reconnect' : 'Connect';
+  $('btnSave').disabled = !on; $('btnRevert').disabled = !on;
+}
+
+// ---------------- Demo orb (no Bluetooth) ----------------
+const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lampbright: 120, lampbreathe: 0,
+  fx_sing: 1, fx_singer: 1, fx_flood: 1, fx_dancer: 1, fx_claps: 1, fx_hats: 1, fx_roll: 1, fx_sparkles: 1, fx_spin: 1, fx_ripple: 1, fx_sling: 1, fx_party: 1, fx_dips: 1,
+  moodscale: 0.8, coloursmooth: 0.0025, warmth: 0.7, warmin: 0.01, warmout: 0.0012, pastel: 170, wobble: 0.03, idlehue: 112, accent: 36,
+  partyrange: 1, partychance: 0.6, partyhold: 32, eyesing: 38, pitch: 1, sidemax: 1, open: 0.75, spring: 250, floodbright: 150,
+  chance: 0.6, eyebang: 38, bop: 5, springlo: 150, springhi: 400, swaylo: 0.3, swayhi: 1, fadeout: 4, cap: 70, coolgain: 3,
+  clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
+  ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
+  sparse: 3, fxshare: 0.27, ledma: 480,
+  col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
+  col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,
+  col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
+  col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0 };
+function startDemo() {
+  const st = { ...DEMO };
+  const reply = (l) => setTimeout(() => onLine(l), 5);
+  link = { send(line) {
+    const w = line.trim().split(/\s+/);
+    if (w[0] === 'get') {
+      Object.entries(st).forEach(([k, v]) => reply(`v ${k} ${v}`));
+      reply('pal 9 0 128 255 0.25 160 255 0.37 175 255 0.5 192 255 0.75 200 255 0.85 232 140 1 258 215 1.25 276 255 1.5 264 255');
+      reply('rows 4 2 1 12.5 28 43 57'); reply('spots 53 54 55 45 46 47 6 7 8 17 18 19'); reply('leds 59'); reply('end');
+    } else if (w[0] === 'set' && w[1] in st) { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); }
+    else if (w[0] === 'defaults') { Object.assign(st, DEMO); link.send('get'); }
+    else if (w[0] === 'pnames') reply('pnames|||');
+  } };
+  $('demoNote').hidden = false;
+  setConnected(false, 'Demo: pretend orb');
+  requestAll();
+  const secsList = ['calm', 'build', 'drop', 'drop', 'groove', 'calm'];
+  let t = 0;
+  clearInterval(demoTimer);
+  demoTimer = setInterval(() => {
+    t++; const sec = secsList[Math.floor(t / 12) % secsList.length];
+    const heat = sec === 'drop' ? 0.6 + 0.2 * Math.sin(t / 3) : sec === 'groove' ? 0.25 : 0.05;
+    const hue = sec === 'drop' ? 258 : sec === 'groove' ? 232 : 192;
+    onLine(`S 160 ${sec} ${heat.toFixed(2)} ${sec === 'drop' && t % 24 > 16 ? 1 : 0} ${sec !== 'calm' ? 1 : 0} ${sec === 'drop' ? 1 : 0} ${st.mode} ${hue % 256} 80`);
+  }, 500);
+}
+
+$('btnConnect').addEventListener('click', async () => {
+  if (!navigator.bluetooth) { $('noBle').hidden = false; toast('Bluetooth is not available in this browser'); return; }
+  try { $('demoNote').hidden = true; await connectBle(); }
+  catch (err) {
+    const blocked = err && (err.name === 'SecurityError' || err.name === 'NotAllowedError' && /permission|policy|disallowed/i.test(err.message || ''));
+    if (blocked) $('noBle').hidden = false;
+    toast(err && err.name === 'NotFoundError' ? 'No orb chosen' : blocked ? 'Bluetooth is blocked on this page' : 'Could not connect: ' + (err.message || err));
+    if (!link) startDemo(); else $('demoNote').hidden = false;
+  }
+});
+// Start in demo so the controls show real values straight away
+if (!navigator.bluetooth) $('noBle').hidden = false;
+startDemo();
+</script>
+
+</body></html>

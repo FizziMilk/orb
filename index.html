@@ -120,6 +120,9 @@ input[type=range].hue::-moz-range-thumb { width: 18px; height: 18px; border-radi
 .presets { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); cursor: pointer; min-width: 120px; flex: 1 1 120px; text-align: left; font: inherit; color: inherit; }
 .preset .pbar { height: 10px; border-radius: 5px; }
+.remote-map { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 8px 0; }
+.remote-map td { border: 1px solid var(--line); padding: 6px; vertical-align: top; }
+details summary { cursor: pointer; }
 .preset.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
 .preset:disabled { opacity: .5; cursor: default; }
 
@@ -259,6 +262,24 @@ select { width: auto; }
 
   <!-- SETUP -->
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
+    <div class="card">
+      <details><summary><h2 style="display:inline">Remote</h2> <span class="muted small">Mr.Go button map</span></summary>
+      <table class="remote-map">
+        <tr><td>☀ + / −</td><td>brightness</td><td>OFF / ON</td><td>lights off / on</td></tr>
+        <tr><td>R G B W</td><td colspan="3">lamp in red, green, blue, warm white</td></tr>
+        <tr><td>FLASH</td><td>white flash</td><td>STROBE</td><td>one bar of strobe</td></tr>
+        <tr><td>FADE</td><td>sensitivity</td><td>SMOOTH</td><td>colour buttons: presets ↔ effects</td></tr>
+      </table>
+      <p class="muted small">Colour buttons, row by row (preset / effect):</p>
+      <table class="remote-map">
+        <tr><td>Ember / spin</td><td>Aurora / ripple</td><td>Neon / flood</td></tr>
+        <tr><td>Sunset Drive / clap</td><td>Warehouse / hats</td><td>Club Light / sparkles</td></tr>
+        <tr><td>Disco / snare roll</td><td>Deep Sea / dancer</td><td>Velvet / party jump</td></tr>
+        <tr><td>Acid / blackout</td><td>Chill / palette sweep</td><td>Bubblegum / slingshot</td></tr>
+      </table>
+      <p class="muted small">Blackout stays dark until the next kick. Switching to effects sparkles once; back to presets sweeps the palette.</p>
+      </details>
+    </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>LED finder</h2><p class="muted small">Lights one LED white. With neighbours on, it also shows where the orb thinks left, right, up and down are.</p></div></div>
       <div class="numrow">
@@ -425,36 +446,51 @@ const PAL_PRESETS = {
   'Aurora': [[0, 100, 255], [0.4, 114, 240], [0.8, 134, 230], [1.1, 178, 220], [1.4, 204, 255]],
   'Warehouse': [[0, 160, 90], [0.5, 150, 55], [1.0, 140, 25], [1.4, 276, 45]],
   'Bubblegum': [[0, 128, 150], [0.5, 146, 120], [0.9, 222, 140], [1.3, 238, 170]],
+  'Velvet': [[0, 172, 255], [0.45, 188, 255], [0.9, 202, 240], [1.3, 218, 255]],
+  'Disco': [[0, 24, 255], [0.5, 34, 230], [1.0, 40, 170], [1.4, 36, 70]],
+  'Acid': [[0, 62, 255], [0.5, 74, 255], [1.0, 86, 255], [1.4, 98, 255]],
 };
 const fxOn = (off = []) => Object.fromEntries(FX.map(f => [f[0], off.includes(f[0]) ? 0 : 1]));
 const ALL_FX = FX.map(f => f[0]);
+// Built-in looks, in the remote's colour-button order (slot 0 = row 3 left ... slot 11 = row 6 right).
+// The app installs each into its slot on the orb, so the remote can pick them.
 const BUILTIN = {
-  'Club Light': { set: { mode: 0, floor: 0, ...Object.fromEntries(ALL_FX.map(k => [k, 1])) }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
-  'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
-  'Lamp': { set: { mode: 1 }, pal: null, desc: 'A plain light in one colour.' },
   'Ember': { set: { mode: 0, floor: 0, ...fxOn(['fx_flood', 'fx_hats', 'fx_party']), coloursmooth: 0.0012, wobble: 0.02, idlehue: 10,
       col_clap: 3, col_spark: 3, col_spin: 3 },
     pal: 'Ember', desc: 'Warm and slow: red to gold, sparks swap red and orange.' },
+  'Aurora': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0015, wobble: 0.08, pastel: 120, dipdepth: 0.4, idlehue: 105,
+      partyrange: 9, partychance: 0.3, partyhold: 32, col_clap: 3, col_spark: 3, col_spin: 3, col_ripple: 3 },
+    pal: 'Aurora', desc: 'Northern lights: green to violet, drifting.' },
   'Neon': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, partyrange: 2, partychance: 0.8, partyhold: 16, idlehue: 200,
       col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_hat: 1, shift_hat: 128, sat_hat: 200,
       col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128, sat_spin: 230 },
     pal: 'Neon', desc: 'Loud: violet and pink, acid green at the peak.' },
-  'Deep Sea': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), idlehue: 150, clapgain: 3.5, sparkgain: 4.5, spingain: 6, ripplegain: 3,
-      col_eye: 2, hue_eye: 4, sat_eye: 190, col_clap: 2, hue_clap: 4, sat_clap: 200, col_spark: 2, hue_spark: 4, sat_spark: 200, col_spin: 2, hue_spin: 4, sat_spin: 190 },
-    pal: 'Deep Sea', desc: 'Cool and moody: navy to ice, coral eye.' },
-  'Aurora': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0015, wobble: 0.08, pastel: 120, dipdepth: 0.4, idlehue: 105,
-      partyrange: 9, partychance: 0.3, partyhold: 32, col_clap: 3, col_spark: 3, col_spin: 3, col_ripple: 3 },
-    pal: 'Aurora', desc: 'Northern lights: green to violet, drifting.' },
+  'Sunset Drive': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.0018, sling: 0.5, spinbeats: 4, spinturns: 1, spindim: 0.5, idlehue: 200 },
+    pal: 'Sunset', desc: 'Purple dusk to orange, long lazy spins.' },
   'Warehouse': { set: { mode: 0, floor: 0, ...fxOn(['fx_party']), dipdepth: 0.95, diprelease: 40, warmth: 0.3, moodscale: 0.4, hats: 2,
       spinbeats: 1, spinturns: 2, spingain: 10, spindim: 1, idlehue: 150,
       col_eye: 2, hue_eye: 0, sat_eye: 255, col_clap: 2, sat_clap: 0, col_spark: 2, sat_spark: 0, col_hat: 2, sat_hat: 0, col_spin: 2, sat_spin: 0 },
     pal: 'Warehouse', desc: 'Techno: cold white, hard kick punches, red eye.' },
-  'Sunset Drive': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.0018, sling: 0.5, spinbeats: 4, spinturns: 1, spindim: 0.5, idlehue: 200 },
-    pal: 'Sunset', desc: 'Purple dusk to orange, long lazy spins.' },
+  'Club Light': { set: { mode: 0, floor: 0, ...fxOn() }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
+  'Disco': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.0018, partyrange: 1, hats: 3, hatgain: 6, sparkgain: 9, idlehue: 32,
+      spinbeats: 6, spinturns: 1.5, spindim: 0.4,
+      col_clap: 2, hue_clap: 36, sat_clap: 80, col_spark: 2, hue_spark: 36, sat_spark: 60, col_hat: 2, hue_hat: 36, sat_hat: 40, col_spin: 2, hue_spin: 36, sat_spin: 50 },
+    pal: 'Disco', desc: 'Mirror ball: amber and gold, lots of glitter.' },
+  'Deep Sea': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), idlehue: 150, clapgain: 3.5, sparkgain: 4.5, spingain: 6, ripplegain: 3,
+      col_eye: 2, hue_eye: 4, sat_eye: 190, col_clap: 2, hue_clap: 4, sat_clap: 200, col_spark: 2, hue_spark: 4, sat_spark: 200, col_spin: 2, hue_spin: 4, sat_spin: 190 },
+    pal: 'Deep Sea', desc: 'Cool and moody: navy to ice, coral eye.' },
+  'Velvet': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0012, dipdepth: 0.5, idlehue: 190,
+      col_eye: 2, hue_eye: 200, sat_eye: 40, col_clap: 1, shift_clap: 32, sat_clap: 200, col_spark: 1, shift_spark: 32, sat_spark: 200, col_spin: 1, shift_spin: 32, sat_spin: 180 },
+    pal: 'Velvet', desc: 'Slow and heavy: indigo to magenta, warm pink sparks.' },
+  'Acid': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, dipdepth: 0.85, diprelease: 60, partyrange: 2, idlehue: 64,
+      col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128 },
+    pal: 'Acid', desc: 'Acid house: yellow to lime, violet sparks, deep kicks.' },
+  'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
   'Bubblegum': { set: { mode: 0, floor: 0.04, ...fxOn(), pastel: 200, partyrange: 2, idlehue: 222,
       col_clap: 1, shift_clap: 128, sat_clap: 150, col_spark: 1, shift_spark: 128, sat_spark: 120, col_hat: 1, shift_hat: 128, sat_hat: 110 },
     pal: 'Bubblegum', desc: 'Pastel pink and aqua, soft and playful.' },
 };
+const builtinPal = p => PAL_PRESETS[p.pal] || PAL_PRESETS['Club Light'];   // (no palette = the default one)
 
 // ---------------- State ----------------
 const vals = {};               // key -> number (from the orb)
@@ -599,18 +635,19 @@ document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('cl
 // Party range
 document.querySelectorAll('#partySeg button').forEach(b => b.addEventListener('click', () => { vals.partyrange = +b.dataset.v; send('set partyrange ' + vals.partyrange); renderAll(); }));
 
-// Presets: 12 slots on the orb. Slots 0-9 show the built-in looks until something is saved over them; 10-11 start empty.
+// Presets: 12 slots on the orb, one per remote colour button. The app installs the built-in looks into empty slots.
 const BUILTIN_NAMES = Object.keys(BUILTIN);
 const NSLOTS = 12;
-let slots = Array(NSLOTS).fill(null);          // null = nothing saved on the orb; else { name, desc, mode, lh, ls, pal }
+let slots = Array(NSLOTS).fill(null);          // null = nothing saved on the orb; else { name, desc, mode, lh, ls, pal, orig }
+let slotSeen = new Set(), installDone = false;  // (install once per connection, after all slot infos arrived)
 let presetEditing = false, presetSel = -1;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function slotView(k) {
   const s = slots[k];
-  if (s) return { name: s.name, desc: s.desc, bar: s.mode === 1 ? css(s.lh, s.ls) : gradient(s.pal.length > 1 ? s.pal : PAL_PRESETS['Club Light']), saved: true };
+  if (s) return { name: s.name, desc: s.desc, bar: s.mode === 1 ? css(s.lh, s.ls) : gradient(s.pal.length > 1 ? s.pal : PAL_PRESETS['Club Light']), saved: !s.orig };
   if (k < BUILTIN_NAMES.length) {
-    const n = BUILTIN_NAMES[k], p = BUILTIN[n], st = PAL_PRESETS[p.pal] || pal;
-    return { name: n, desc: p.desc, bar: n === 'Lamp' ? 'var(--accent)' : gradient(st.length > 1 ? st : PAL_PRESETS['Club Light']) };
+    const n = BUILTIN_NAMES[k], p = BUILTIN[n];
+    return { name: n, desc: p.desc, bar: gradient(builtinPal(p)) };
   }
   return { name: 'Empty slot', desc: 'Edit to save the current look here.', bar: 'var(--line)', empty: true };
 }
@@ -620,7 +657,7 @@ function renderPresets() {
     const v = slotView(k), b = document.createElement('button');
     b.className = 'preset' + (presetEditing && k === presetSel ? ' sel' : ''); b.type = 'button'; b.dataset.slot = k;
     b.disabled = !!v.empty && !presetEditing;
-    b.innerHTML = `<span class="pbar" style="background:${v.bar}"></span><b>${esc(v.name)}</b><span class="muted small">${esc(v.desc)}${v.saved && k < BUILTIN_NAMES.length ? ' (edited)' : ''}</span>`;
+    b.innerHTML = `<span class="pbar" style="background:${v.bar}"></span><b>${esc(v.name)}</b><span class="muted small">${esc(v.desc)}${v.saved ? ' (edited)' : ''}</span>`;
     box.appendChild(b);
   }
   const ed = $('presetEditor'); ed.hidden = !presetEditing;
@@ -629,13 +666,13 @@ function renderPresets() {
   const k = presetSel, v = slotView(k);
   ed.innerHTML = `<label class="small">Name <input type="text" id="peName" maxlength="30" value="${v.empty ? '' : esc(v.name)}" placeholder="My look"></label>
     <label class="small">Description <input type="text" id="peDesc" maxlength="60" value="${v.empty ? '' : esc(v.desc)}" placeholder="What it's for"></label>
-    <div class="btns"><button class="primary" id="peSave">Save the current look here</button>${slots[k] ? `<button id="peClear">${k < BUILTIN_NAMES.length ? 'Reset to built-in' : 'Clear slot'}</button>` : ''}</div>`;
+    <div class="btns"><button class="primary" id="peSave">Save the current look here</button>${slots[k] && !slots[k].orig && k < BUILTIN_NAMES.length ? '<button id="peClear">Reset to built-in</button>' : ''}</div>`;
 }
 function applyBuiltin(name) {
   const p = BUILTIN[name];
   gettingAll = true; send('defaults nocal');           // everything back to today's tuning (calibration kept)...
   Object.entries(p.set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });   // ...then this look
-  if (p.pal) { pal = PAL_PRESETS[p.pal].map(s => [...s]); sendPalette(); pendingPal = p.pal; }
+  pal = builtinPal(p).map(s => [...s]); sendPalette(); pendingPal = p.pal || 'Club Light';
   send('save');                                        // ...and it becomes the startup look
   renderAll(); toast(name + ' applied');
 }
@@ -660,8 +697,30 @@ $('presetEditor').addEventListener('click', (e) => {
     if (palDirty) send(palLine());                     // make sure the orb has the palette you're looking at
     send(`psave ${k} ${name}|${desc}`); toast('Saved "' + name + '" - the orb now starts with it');
   }
-  if (e.target.id === 'peClear') { send('pclear ' + k); toast(k < BUILTIN_NAMES.length ? 'Back to the built-in ' + BUILTIN_NAMES[k] : 'Slot cleared'); }
+  if (e.target.id === 'peClear') { send('pclear ' + k); installBuiltins([k]); toast('Back to the built-in ' + BUILTIN_NAMES[k]); }
 });
+// Put built-in looks into their slots on the orb (quietly), then go back to the startup look
+function palLineOf(stops) { return 'pal ' + stops.length + ' ' + stops.map(([p, h, s]) => `${(+p).toFixed(3)} ${Math.round(h)} ${Math.round(s)}`).join(' '); }
+function installBuiltins(list) {
+  list = list.filter(k => k < BUILTIN_NAMES.length);
+  if (!list.length) return;
+  send('quiet 1');
+  list.forEach(k => {
+    const n = BUILTIN_NAMES[k], p = BUILTIN[n];
+    send('defaults nocal');
+    Object.entries(p.set).forEach(([key, v]) => send(`set ${key} ${v}`));
+    send(palLineOf(builtinPal(p)));
+    send(`psave ${k} ${n}|${p.desc}|b`);
+  });
+  send('defaults nocal'); send('quiet 0');
+  gettingAll = true; send('load'); send('pinfo');      // back to the startup look, and fresh slot info
+}
+function maybeInstall() {
+  if (installDone || slotSeen.size < NSLOTS) return;
+  installDone = true;
+  const empty = []; for (let k = 0; k < NSLOTS; k++) if (!slots[k]) empty.push(k);
+  if (empty.length) { installBuiltins(empty); toast('Putting ' + empty.length + ' presets on the orb…'); }
+}
 renderPresets();
 
 // ---------------- Palette ----------------
@@ -906,9 +965,9 @@ function onLine(line) {
       if (f[2] === '1' && f.length >= 7) {
         const [md, lh, ls] = f[5].trim().split(/\s+/).map(Number), pw = f[6].trim().split(/\s+/).map(Number), pl = [];
         for (let i = 0; i < pw[0]; i++) pl.push([pw[1 + 3 * i], pw[2 + 3 * i], pw[3 + 3 * i]]);
-        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl };
+        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl, orig: f[7] === '1' };
       } else slots[k] = null;
-      renderPresets();
+      slotSeen.add(k); renderPresets(); maybeInstall();
     }
     return;
   }
@@ -951,7 +1010,7 @@ $('setPin').addEventListener('click', () => {
   if (p.length < 4 || p.length > 8 || /\s/.test(p)) { toast('Use 4 to 8 characters, no spaces'); return; }
   newPinPending = p; send('setpin ' + p); $('newPin').value = '';
 });
-function requestAll() { gettingAll = true; send('get'); send('pinfo'); }
+function requestAll() { gettingAll = true; slotSeen = new Set(); installDone = false; send('get'); send('pinfo'); }
 
 // ---------------- Bluetooth link (Nordic UART) ----------------
 const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -1088,7 +1147,7 @@ function startDemo() {
     else if (w[0] === 'defaults') { Object.assign(st, DEMO); link.send('get'); }
     else if (w[0] === 'pinfo') for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`);
     else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
-      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${pal.length} ${pal.map(s => s.join(' ')).join(' ')}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${pal.length} ${pal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}`; reply('ok psave ' + k); reply(demoSlots[k]); }
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
     else if (w[0] === 'setpin') reply('pin changed');

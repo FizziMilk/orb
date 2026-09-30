@@ -120,6 +120,8 @@ input[type=range].hue::-moz-range-thumb { width: 18px; height: 18px; border-radi
 .presets { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); cursor: pointer; min-width: 120px; flex: 1 1 120px; text-align: left; font: inherit; color: inherit; }
 .preset .pbar { height: 10px; border-radius: 5px; }
+.preset.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.preset:disabled { opacity: .5; cursor: default; }
 
 /* Setup */
 .numrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -197,9 +199,9 @@ select { width: auto; }
       <div class="rows" id="homeCtl"></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Presets</h2><p class="muted small">Built-in looks reset every setting to the tuned defaults, then apply their look, so they're also a way back if you've changed too much. Your own slots store everything too. Neither touches the Setup calibration.</p></div></div>
+      <div class="card-head"><div class="grow"><h2>Presets</h2><p class="muted small">Tap a look to use it; the orb starts up with the last one you picked. Edit saves the current look into any of the 9 slots. Built-in looks you've saved over can be reset. The Setup calibration is never touched.</p></div><button class="small" id="presetEdit" aria-pressed="false">Edit</button></div>
       <div class="presets" id="builtinPresets"></div>
-      <div class="rows" id="userPresets"></div>
+      <div class="rows" id="presetEditor" hidden></div>
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>Effects on / off</h2><p class="muted small">Try fires an effect now, whatever the music is doing.</p></div></div>
@@ -422,8 +424,8 @@ const BUILTIN = {
   'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
   'Lamp': { set: { mode: 1 }, pal: null, desc: 'A plain light in one colour.' },
   'Ember': { set: { mode: 0, floor: 0, ...fxOn(['fx_flood', 'fx_hats', 'fx_party']), coloursmooth: 0.0012, wobble: 0.02, idlehue: 10,
-      col_clap: 2, hue_clap: 30, sat_clap: 60, col_spark: 2, hue_spark: 30, sat_spark: 60, col_spin: 2, hue_spin: 30, sat_spin: 60 },
-    pal: 'Ember', desc: 'Warm and slow: red to gold, white sparks.' },
+      col_clap: 3, col_spark: 3, col_spin: 3 },
+    pal: 'Ember', desc: 'Warm and slow: red to gold, sparks swap red and orange.' },
   'Neon': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, partyrange: 2, partychance: 0.8, partyhold: 16, idlehue: 200,
       col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_hat: 1, shift_hat: 128, sat_hat: 200,
       col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128, sat_spin: 230 },
@@ -517,7 +519,7 @@ function colourRow(e, autoDesc) {
   const box = document.createElement('div'); box.className = 'rows'; box.style.borderTop = '1px solid var(--line)'; box.style.paddingTop = '12px';
   const head = document.createElement('div'); head.className = 'card-head';
   head.innerHTML = `<div class="grow"><h3>Colour</h3><p class="muted small" data-desc></p></div><span class="swatch" data-sw title="Colour on the current glow"></span>
-    <div class="seg"><button data-m="0">Auto</button><button data-m="1">Shift</button><button data-m="2">Fixed</button></div>`;
+    <div class="seg"><button data-m="0">Auto</button><button data-m="1">Shift</button><button data-m="2">Fixed</button><button data-m="3">Swap</button></div>`;
   box.appendChild(head);
   const sh = slider(S('shift_' + e, 'Shift from the glow colour', -128, 128, 1, { hint: 'Moves round the colour wheel from whatever the glow is showing, so it suits every palette.' }));
   const hu = slider(S('hue_' + e, 'Colour', 0, 255, 1, { hue: true }));
@@ -532,11 +534,11 @@ function colourRow(e, autoDesc) {
 function renderColourRow(r) {
   const m = +(vals['col_' + r.e] ?? 0);
   r.head.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.m === m)));
-  r.sh.hidden = m !== 1; r.hu.hidden = m !== 2; r.sa.hidden = m === 0;
-  r.head.querySelector('[data-desc]').textContent = m === 0 ? 'Auto: ' + r.autoDesc + '.' : m === 1 ? 'Follows the glow, shifted round the wheel.' : 'Always this colour.';
+  r.sh.hidden = m !== 1; r.hu.hidden = m !== 2; r.sa.hidden = m === 0 || m === 3;
+  r.head.querySelector('[data-desc]').textContent = m === 0 ? 'Auto: ' + r.autoDesc + '.' : m === 1 ? 'Follows the glow, shifted round the wheel.' : m === 3 ? 'Palette swap: the palette colour from its other half (low glow gets a high colour and back).' : 'Always this colour.';
   const g = currentHue, sat = vals['sat_' + r.e] ?? 255;
   const sw = r.head.querySelector('[data-sw]');
-  sw.style.background = m === 0 ? 'repeating-linear-gradient(45deg, var(--panel-2) 0 4px, var(--line) 4px 8px)' : m === 1 ? css(g + (vals['shift_' + r.e] ?? 0), sat) : css(vals['hue_' + r.e] ?? 0, sat);
+  sw.style.background = m === 3 ? gradient(pal.length ? pal : PAL_PRESETS['Club Light']) : m === 0 ? 'repeating-linear-gradient(45deg, var(--panel-2) 0 4px, var(--line) 4px 8px)' : m === 1 ? css(g + (vals['shift_' + r.e] ?? 0), sat) : css(vals['hue_' + r.e] ?? 0, sat);
 }
 
 // ---------------- Build the tabs ----------------
@@ -576,35 +578,70 @@ document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('cl
 // Party range
 document.querySelectorAll('#partySeg button').forEach(b => b.addEventListener('click', () => { vals.partyrange = +b.dataset.v; send('set partyrange ' + vals.partyrange); renderAll(); }));
 
-// Presets
-Object.entries(BUILTIN).forEach(([name, p]) => {
-  const b = document.createElement('button'); b.className = 'preset'; b.type = 'button';
-  const palStops = PAL_PRESETS[p.pal] || pal;
-  b.innerHTML = `<span class="pbar" style="background:${name === 'Lamp' ? 'var(--accent)' : gradient(palStops.length ? palStops : PAL_PRESETS['Club Light'])}"></span><b>${name}</b><span class="muted small">${p.desc}</span>`;
-  b.addEventListener('click', () => {
-    gettingAll = true; send('defaults nocal');           // everything back to today's tuning (calibration kept)...
-    Object.entries(p.set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });   // ...then this look
-    if (p.pal) { pal = PAL_PRESETS[p.pal].map(s => [...s]); sendPalette(); pendingPal = p.pal; }
-    renderAll(); toast(name + ' applied - Save to orb to keep it');
-  });
-  $('builtinPresets').appendChild(b);
-});
-let userNames = ['', '', ''];
-function renderUserPresets() {
-  const box = $('userPresets'); box.innerHTML = '';
-  for (let k = 0; k < 3; k++) {
-    const row = document.createElement('div'); row.className = 'numrow';
-    row.innerHTML = `<input type="text" id="pn${k}" placeholder="Slot ${k + 1} (empty)" value="${userNames[k] || ''}" style="flex:1 1 160px;width:auto" aria-label="Name for slot ${k + 1}">
-      <button class="small" data-psave="${k}">Save here</button><button class="small" data-pload="${k}" ${userNames[k] ? '' : 'disabled'}>Load</button>`;
-    box.appendChild(row);
+// Presets: 9 slots on the orb. Slots 0-5 show the built-in looks until something is saved over them; 6-8 start empty.
+const BUILTIN_NAMES = Object.keys(BUILTIN);
+const NSLOTS = 9;
+let slots = Array(NSLOTS).fill(null);          // null = nothing saved on the orb; else { name, desc, mode, lh, ls, pal }
+let presetEditing = false, presetSel = -1;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function slotView(k) {
+  const s = slots[k];
+  if (s) return { name: s.name, desc: s.desc, bar: s.mode === 1 ? css(s.lh, s.ls) : gradient(s.pal.length > 1 ? s.pal : PAL_PRESETS['Club Light']), saved: true };
+  if (k < BUILTIN_NAMES.length) {
+    const n = BUILTIN_NAMES[k], p = BUILTIN[n], st = PAL_PRESETS[p.pal] || pal;
+    return { name: n, desc: p.desc, bar: n === 'Lamp' ? 'var(--accent)' : gradient(st.length > 1 ? st : PAL_PRESETS['Club Light']) };
   }
+  return { name: 'Empty slot', desc: 'Edit to save the current look here.', bar: 'var(--line)', empty: true };
 }
-renderUserPresets();
-$('userPresets').addEventListener('click', (e) => {
-  const s = e.target.closest('[data-psave]'), l = e.target.closest('[data-pload]');
-  if (s) { const k = +s.dataset.psave; const name = ($('pn' + k).value || 'My preset ' + (k + 1)).replace(/[|\n]/g, ' ').slice(0, 30); send(`psave ${k} ${name}`); userNames[k] = name; renderUserPresets(); toast('Saved to slot ' + (k + 1)); }
-  if (l) { send('pload ' + l.dataset.pload); toast('Loading slot ' + (+l.dataset.pload + 1)); }
+function renderPresets() {
+  const box = $('builtinPresets'); box.innerHTML = '';
+  for (let k = 0; k < NSLOTS; k++) {
+    const v = slotView(k), b = document.createElement('button');
+    b.className = 'preset' + (presetEditing && k === presetSel ? ' sel' : ''); b.type = 'button'; b.dataset.slot = k;
+    b.disabled = !!v.empty && !presetEditing;
+    b.innerHTML = `<span class="pbar" style="background:${v.bar}"></span><b>${esc(v.name)}</b><span class="muted small">${esc(v.desc)}${v.saved && k < BUILTIN_NAMES.length ? ' (edited)' : ''}</span>`;
+    box.appendChild(b);
+  }
+  const ed = $('presetEditor'); ed.hidden = !presetEditing;
+  if (!presetEditing) return;
+  if (presetSel < 0) { ed.innerHTML = '<p class="muted small">Pick a slot above. Saving stores everything the orb is doing right now (except the Setup calibration).</p>'; return; }
+  const k = presetSel, v = slotView(k);
+  ed.innerHTML = `<label class="small">Name <input type="text" id="peName" maxlength="30" value="${v.empty ? '' : esc(v.name)}" placeholder="My look"></label>
+    <label class="small">Description <input type="text" id="peDesc" maxlength="60" value="${v.empty ? '' : esc(v.desc)}" placeholder="What it's for"></label>
+    <div class="btns"><button class="primary" id="peSave">Save the current look here</button>${slots[k] ? `<button id="peClear">${k < BUILTIN_NAMES.length ? 'Reset to built-in' : 'Clear slot'}</button>` : ''}</div>`;
+}
+function applyBuiltin(name) {
+  const p = BUILTIN[name];
+  gettingAll = true; send('defaults nocal');           // everything back to today's tuning (calibration kept)...
+  Object.entries(p.set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });   // ...then this look
+  if (p.pal) { pal = PAL_PRESETS[p.pal].map(s => [...s]); sendPalette(); pendingPal = p.pal; }
+  send('save');                                        // ...and it becomes the startup look
+  renderAll(); toast(name + ' applied');
+}
+$('builtinPresets').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-slot]'); if (!b) return;
+  const k = +b.dataset.slot;
+  if (presetEditing) { presetSel = k; renderPresets(); $('presetEditor').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+  if (slots[k]) { send('pload ' + k); toast('Loading ' + slots[k].name); }
+  else if (k < BUILTIN_NAMES.length) applyBuiltin(BUILTIN_NAMES[k]);
 });
+$('presetEdit').addEventListener('click', () => {
+  presetEditing = !presetEditing; presetSel = -1;
+  $('presetEdit').textContent = presetEditing ? 'Done' : 'Edit'; $('presetEdit').setAttribute('aria-pressed', String(presetEditing));
+  renderPresets();
+});
+$('presetEditor').addEventListener('click', (e) => {
+  const k = presetSel; if (k < 0) return;
+  const clean = t => t.replace(/[|\n\r]/g, ' ').trim();
+  if (e.target.id === 'peSave') {
+    const name = clean($('peName').value).slice(0, 30) || (k < BUILTIN_NAMES.length ? BUILTIN_NAMES[k] : 'My look ' + (k - BUILTIN_NAMES.length + 1));
+    const desc = clean($('peDesc').value).slice(0, 60);
+    if (palDirty) send(palLine());                     // make sure the orb has the palette you're looking at
+    send(`psave ${k} ${name}|${desc}`); toast('Saved "' + name + '" - the orb now starts with it');
+  }
+  if (e.target.id === 'peClear') { send('pclear ' + k); toast(k < BUILTIN_NAMES.length ? 'Back to the built-in ' + BUILTIN_NAMES[k] : 'Slot cleared'); }
+});
+renderPresets();
 
 // ---------------- Palette ----------------
 function unwrap(stops) {               // hues continue past 255 so the blend goes the short way (red at 255 -> orange 268)
@@ -842,6 +879,18 @@ $('btnRevert').addEventListener('click', () => { gettingAll = true; send('load')
 let currentHue = 20;
 function updateOrbDot(h, v = 120) { currentHue = h; document.documentElement.style.setProperty('--orb', css(h, 235)); }
 function onLine(line) {
+  if (line.startsWith('pi|')) {                          // a preset slot: pi|K|1|name|desc|mode lamphue lampsat|palN pos hue sat ...
+    const f = line.split('|'), k = +f[1];
+    if (k >= 0 && k < NSLOTS) {
+      if (f[2] === '1' && f.length >= 7) {
+        const [md, lh, ls] = f[5].trim().split(/\s+/).map(Number), pw = f[6].trim().split(/\s+/).map(Number), pl = [];
+        for (let i = 0; i < pw[0]; i++) pl.push([pw[1 + 3 * i], pw[2 + 3 * i], pw[3 + 3 * i]]);
+        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl };
+      } else slots[k] = null;
+      renderPresets();
+    }
+    return;
+  }
   const w = line.trim().split(/\s+/);
   switch (w[0]) {
     case 'v': vals[w[1]] = +w[2]; if (!gettingAll) renderAll(); break;
@@ -853,7 +902,6 @@ function onLine(line) {
       gettingAll = false;
       if (pendingPal) { pal = PAL_PRESETS[pendingPal].map(s => [...s]); pendingPal = null; }   // the reset's reply carried the default palette
       renderAll(); break;
-    case 'pnames': userNames = line.split('|').slice(1); renderUserPresets(); break;
     case 'S': {
       const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
       $('stBpm').textContent = bpm; const se = $('stSec'); se.textContent = sec; se.className = 'sec-' + sec;
@@ -882,7 +930,7 @@ $('setPin').addEventListener('click', () => {
   if (p.length < 4 || p.length > 8 || /\s/.test(p)) { toast('Use 4 to 8 characters, no spaces'); return; }
   newPinPending = p; send('setpin ' + p); $('newPin').value = '';
 });
-function requestAll() { gettingAll = true; send('get'); send('pnames'); }
+function requestAll() { gettingAll = true; send('get'); send('pinfo'); }
 
 // ---------------- Bluetooth link (Nordic UART) ----------------
 const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -948,7 +996,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
   col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0 };
 function startDemo() {
-  const st = { ...DEMO };
+  const st = { ...DEMO }, demoSlots = {};
   const reply = (l) => setTimeout(() => onLine(l), 5);
   link = { send(line) {
     const w = line.trim().split(/\s+/);
@@ -958,7 +1006,11 @@ function startDemo() {
       reply('rows 4 2 1 12.5 28 43 57'); reply('spots 53 54 55 45 46 47 6 7 8 17 18 19'); reply('leds 59'); reply('end');
     } else if (w[0] === 'set' && w[1] in st) { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); }
     else if (w[0] === 'defaults') { Object.assign(st, DEMO); link.send('get'); }
-    else if (w[0] === 'pnames') reply('pnames|||');
+    else if (w[0] === 'pinfo') for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`);
+    else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
+      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${pal.length} ${pal.map(s => s.join(' ')).join(' ')}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+    else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
+    else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
     else if (w[0] === 'setpin') reply('pin changed');
   } };
   $('demoNote').hidden = false;
@@ -989,6 +1041,7 @@ $('btnConnect').addEventListener('click', async () => {
 if (!navigator.bluetooth) $('noBle').hidden = false;
 startDemo();
 </script>
+
 
 </body>
 </html>

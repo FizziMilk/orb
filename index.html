@@ -128,6 +128,10 @@ details summary { cursor: pointer; }
 #builtinPresets .preset { min-width: 0; padding: 8px; gap: 4px; align-content: start; }
 #builtinPresets .preset b { font-size: clamp(0.7rem, 3.3vw, 0.88rem); line-height: 1.2; overflow: hidden; }
 #builtinPresets .preset .muted { font-size: 0.72rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tcols { gap: 10px; }
+.tcols input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; vertical-align: middle; }
+.numrow.rowcal { flex-wrap: nowrap; gap: 6px; padding: 4px 6px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+.rowcal.sel { border-color: #3a8bff; background: color-mix(in srgb, #3a8bff 12%, transparent); }
 .preset.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
 .preset:disabled { opacity: .5; cursor: default; }
 
@@ -136,9 +140,10 @@ details summary { cursor: pointer; }
 input[type=number], input[type=text], select { font: 500 0.9rem var(--mono); color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 84px; }
 input[type=text] { width: 100%; font-family: var(--body); }
 select { width: auto; }
-.grid-spots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.grid-spots { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
 .spotgrp { display: grid; gap: 6px; }
-.spotgrp .numrow input { width: 64px; }
+.spotgrp .numrow { flex-wrap: nowrap; gap: 4px; }
+.spotgrp input, .rowcal input { padding-left: 2px; padding-right: 2px; min-width: 0; }
 .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 
@@ -272,7 +277,7 @@ select { width: auto; }
       <table class="remote-map">
         <tr><td>☀ + / −</td><td>brightness</td><td>OFF / ON</td><td>lights off / on</td></tr>
         <tr><td>R G B W</td><td colspan="3">lamp in red, green, blue, warm white</td></tr>
-        <tr><td>FLASH</td><td>white flash</td><td>STROBE</td><td>one bar of strobe</td></tr>
+        <tr><td>FLASH</td><td>white flash</td><td>STROBE</td><td>half a bar of strobe</td></tr>
         <tr><td>FADE</td><td>sensitivity</td><td>SMOOTH</td><td>colour buttons: presets ↔ effects</td></tr>
       </table>
       <p class="muted small">Colour buttons, row by row (preset / effect):</p>
@@ -297,28 +302,38 @@ select { width: auto; }
       <div class="legend"><span><i style="background:#fff"></i>this LED</span><span><i style="background:#e03030"></i>left</span><span><i style="background:#e0a020"></i>right</span><span><i style="background:#30c030"></i>up</span><span><i style="background:#3050f0"></i>down</span></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Face column</h2><p class="muted small">For each turn of the strip, the LED that faces the room. Halves are fine when the front sits between two LEDs. Tick the turn where the eye rests.</p></div></div>
+      <div class="card-head"><div class="grow"><h2>Front line</h2><p class="muted small">Where the eye lives: one LED per turn of the strip, facing the room. The orb shows it live while you adjust.</p></div></div>
       <ol class="muted small" style="margin:0;padding-left:18px;display:grid;gap:4px">
-        <li>Find the LED that faces the room with the finder above.</li>
-        <li>Go one turn up and down from it and find the LED straight above or below. Enter each one here, bottom turn first.</li>
-        <li>Check left and right: if the finder's red LED isn't on the left, flip the direction.</li>
+        <li>Turn the orb so its front (the IR sensor's side) faces you and press <b>Show</b>.</li>
+        <li>Move the whole white line until it runs straight up the middle facing you.</li>
+        <li>Tap a turn to light it <span style="color:#3a8bff">blue</span>; nudge any turn that's off the line.</li>
+        <li>Pick the turn the eye rests on (<span style="color:#3c3">green</span>), then <b>Save</b>.</li>
       </ol>
+      <div class="numrow"><button id="showCol" class="primary">Show</button>
+        <span class="small muted">Whole line:</span><button class="small" id="shiftL" aria-label="Move the whole line one LED back">◀ 1</button><button class="small" id="shiftR" aria-label="Move the whole line one LED on">1 ▶</button></div>
+      <div class="numrow tcols"><span class="small muted">Test colours:</span>
+        <label class="small"><input type="color" data-tcol="0" value="#828282"> line</label>
+        <label class="small"><input type="color" data-tcol="1" value="#006eff"> selected</label>
+        <label class="small"><input type="color" data-tcol="2" value="#00aa28"> eye</label>
+        <label class="small"><input type="color" data-tcol="3" value="#000000"> background</label></div>
       <div class="rows" id="rowsEd"></div>
       <div class="numrow">
-        <button id="rowAdd" class="small">Add turn</button>
+        <button id="rowAdd" class="small">Add turn</button><button id="rowDel" class="small ghost">Remove top turn</button>
         <span class="small muted">Higher LED numbers go</span>
         <div class="seg" id="dirSeg"><button data-v="1">Right</button><button data-v="-1">Left</button></div>
       </div>
-      <div class="btns"><button class="primary" id="rowsSend">Send face column</button><button id="showCol">Show on the orb</button></div>
+      <p class="muted small">Left/right check: in the LED finder with neighbours on, red should be on your left. If it isn't, flip this.</p>
+      <div class="btns"><button class="primary" id="rowsSend">Save</button><button id="calDone" class="ghost">Back to music</button></div>
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>Effect spots</h2><p class="muted small">Which LEDs the clap and hat sparks use. Three each.</p></div></div>
       <div class="grid-spots" id="spotsEd"></div>
-      <div class="btns"><button class="primary" id="spotsSend">Send spots</button><button id="showSpots">Show on the orb</button></div>
+      <p class="muted small">Press Show, then nudge each LED with ◀ ▶; the orb updates live.</p>
+      <div class="btns"><button id="showSpots">Show</button><button class="primary" id="spotsSend">Save</button></div>
     </div>
     <div class="card">
       <h2>Test patterns</h2>
-      <div class="btns"><button id="tTurns">Each turn in its own colour</button><button id="tCol">Face column and spots</button><button id="tOff" class="ghost">Back to music</button></div>
+      <div class="btns"><button id="tTurns">Each turn in its own colour</button><button id="tCol">Front line</button><button id="tSpots">Effect spots</button><button id="tOff" class="ghost">Back to music</button></div>
     </div>
     <div class="card">
       <h2>PIN</h2>
@@ -900,51 +915,73 @@ $('fNext').addEventListener('click', () => findLed(+$('fLed').value + 1));
 $('fLed').addEventListener('change', () => findLed(+$('fLed').value));
 $('fNb').addEventListener('change', (e) => send('tool nb ' + (e.target.checked ? 1 : 0)));
 $('fStop').addEventListener('click', () => send('tool off'));
+let rowSel = -1;                                       // the turn shown in blue while calibrating
 function renderRows() {
   const box = $('rowsEd'); box.innerHTML = '';
   for (let i = rows.n - 1; i >= 0; i--) {
-    const r = document.createElement('div'); r.className = 'numrow';
-    r.innerHTML = `<span class="small muted" style="width:92px">${i === rows.n - 1 ? 'Top turn' : i === 0 ? 'Bottom turn' : 'Turn ' + (i + 1)}</span>
-      <input type="number" step="0.5" min="0" max="${ledCount - 1}" value="${rows.r[i]}" data-row="${i}" aria-label="Front LED of turn ${i + 1}">
-      <button class="small" data-usef="${i}">Use finder LED</button>
-      <label class="numrow small"><input type="radio" name="centreRow" value="${i}" ${rows.center === i ? 'checked' : ''}> eye rests here</label>
-      ${rows.n > 1 ? `<button class="small ghost" data-rdel="${i}" aria-label="Remove turn ${i + 1}">Remove</button>` : ''}`;
+    const r = document.createElement('div'); r.className = 'numrow rowcal' + (i === rowSel ? ' sel' : ''); r.dataset.rowsel = i;
+    r.innerHTML = `<span class="small" style="width:58px;flex:none">${i === rows.n - 1 ? 'Top turn' : i === 0 ? 'Bottom turn' : 'Turn ' + (i + 1)}</span>
+      <button class="small" data-rnudge="${i}" data-d="-0.5" aria-label="Turn ${i + 1}: half an LED back">◀</button>
+      <input type="text" inputmode="decimal" value="${rows.r[i]}" data-row="${i}" aria-label="Front LED of turn ${i + 1}" style="width:60px;text-align:center">
+      <button class="small" data-rnudge="${i}" data-d="0.5" aria-label="Turn ${i + 1}: half an LED on">▶</button>
+      <label class="numrow small"><input type="radio" name="centreRow" value="${i}" ${rows.center === i ? 'checked' : ''}> eye</label>
+`;
     box.appendChild(r);
   }
 }
+function liveCol() { send(rowsLine()); send('tool column ' + rowSel); }
 $('rowsEd').addEventListener('change', (e) => {
-  if (e.target.dataset.row !== undefined) rows.r[+e.target.dataset.row] = +e.target.value;
-  if (e.target.name === 'centreRow') rows.center = +e.target.value;
+  if (e.target.dataset.row !== undefined) {                    // typed: accepts 22.5 or 22,5; rounds to the nearest half
+    const v = parseFloat(String(e.target.value).replace(',', '.'));
+    if (isFinite(v)) rows.r[+e.target.dataset.row] = Math.max(0, Math.min(ledCount - 1, Math.round(v * 2) / 2));
+    rowSel = +e.target.dataset.row; liveCol();
+  }
+  if (e.target.name === 'centreRow') { rows.center = +e.target.value; liveCol(); }
 });
 $('rowsEd').addEventListener('click', (e) => {
-  const u = e.target.closest('[data-usef]'), d = e.target.closest('[data-rdel]');
-  if (u) { rows.r[+u.dataset.usef] = +$('fLed').value; renderRows(); }
-  if (d) { const i = +d.dataset.rdel; rows.r.splice(i, 1); rows.n--; if (i < rows.center) rows.center--; rows.center = Math.max(0, Math.min(rows.center, rows.n - 1)); renderRows(); }
+  const n = e.target.closest('[data-rnudge]'), d = e.target.closest('[data-rdel]'), row = e.target.closest('[data-rowsel]');
+  if (n) { const i = +n.dataset.rnudge; rows.r[i] = Math.max(0, Math.min(ledCount - 1, rows.r[i] + +n.dataset.d)); rowSel = i; liveCol(); return; }
+  if (d) { const i = +d.dataset.rdel; rows.r.splice(i, 1); rows.n--; if (i < rows.center) rows.center--; rows.center = Math.max(0, Math.min(rows.center, rows.n - 1)); rowSel = -1; liveCol(); return; }
+  if (row && !e.target.closest('input,label')) { rowSel = +row.dataset.rowsel; renderRows(); send('tool column ' + rowSel); }
 });
-$('rowAdd').addEventListener('click', () => { if (rows.n >= 8) return; rows.r.push(Math.min(ledCount - 1, (rows.r[rows.n - 1] || 0) + 15)); rows.n++; renderRows(); });
-document.querySelectorAll('#dirSeg button').forEach(b => b.addEventListener('click', () => { rows.dir = +b.dataset.v; renderAll(); }));
+function shiftAll(dv) { rows.r = rows.r.map((v, i) => i < rows.n ? Math.max(0, Math.min(ledCount - 1, v + dv)) : v); liveCol(); }
+$('shiftL').addEventListener('click', () => shiftAll(-1));
+// Test colours: darker picks = dimmer LEDs. Only for this test, not saved.
+document.querySelectorAll('[data-tcol]').forEach(inp => inp.addEventListener('input', () => {
+  const h = inp.value.replace('#', ''), r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  sendSoon(`tool tcol ${inp.dataset.tcol} ${r} ${g} ${b}`, 'tcol' + inp.dataset.tcol);
+  sendSoon('tool column ' + rowSel, 'tcolshow');
+}));
+$('shiftR').addEventListener('click', () => shiftAll(1));
+$('rowDel').addEventListener('click', () => { if (rows.n <= 1) return; rows.r.splice(rows.n - 1, 1); rows.n--; rows.center = Math.min(rows.center, rows.n - 1); rowSel = -1; liveCol(); });
+$('rowAdd').addEventListener('click', () => { if (rows.n >= 8) return; rows.r.push(Math.min(ledCount - 1, (rows.r[rows.n - 1] || 0) + 15)); rows.n++; rowSel = rows.n - 1; liveCol(); });
+document.querySelectorAll('#dirSeg button').forEach(b => b.addEventListener('click', () => { rows.dir = +b.dataset.v; renderAll(); liveCol(); }));
 function rowsLine() {                                  // bottom to top; the eye stays on the turn you ticked
   const idx = rows.r.slice(0, rows.n).map((v, i) => i).sort((a, b) => rows.r[a] - rows.r[b]);
-  const centre = idx.indexOf(rows.center);
-  rows.r = idx.map(i => +rows.r[i]); rows.center = Math.max(0, centre); renderRows();
+  rows.center = Math.max(0, idx.indexOf(rows.center)); if (rowSel >= 0) rowSel = idx.indexOf(rowSel);
+  rows.r = idx.map(i => +rows.r[i]); renderRows();
   return `rows ${rows.n} ${rows.center} ${rows.dir} ${rows.r.join(' ')}`;
 }
-$('rowsSend').addEventListener('click', () => { send(rowsLine()); toast('Face column sent - Save to orb to keep it'); });
-$('showCol').addEventListener('click', () => { send(rowsLine()); send('tool column'); });
+$('rowsSend').addEventListener('click', () => { send(rowsLine()); send('save'); toast('Front line saved on the orb'); });
+$('showCol').addEventListener('click', () => { rowSel = -1; liveCol(); });
+$('calDone').addEventListener('click', () => { rowSel = -1; renderRows(); send('tool off'); });
 const SPOT_GROUPS = ['Clap spot, left', 'Clap spot, right', 'Hat spot, left', 'Hat spot, right'];
 function renderSpots() {
   const box = $('spotsEd'); box.innerHTML = '';
   SPOT_GROUPS.forEach((name, g) => {
     const d = document.createElement('div'); d.className = 'spotgrp';
-    d.innerHTML = `<span class="small">${name}</span><div class="numrow">` + [0, 1, 2].map(k => `<input type="number" min="0" max="${ledCount - 1}" value="${spots[g * 3 + k]}" data-spot="${g * 3 + k}" aria-label="${name} LED ${k + 1}">`).join('') + '</div>';
+    d.innerHTML = `<span class="small">${name}</span>` + [0, 1, 2].map(k => { const j = g * 3 + k; return `<div class="numrow"><button class="small" data-snudge="${j}" data-d="-1" aria-label="${name} LED ${k + 1} back">◀</button><input type="number" min="0" max="${ledCount - 1}" value="${spots[j]}" data-spot="${j}" aria-label="${name} LED ${k + 1}" style="width:46px;text-align:center"><button class="small" data-snudge="${j}" data-d="1" aria-label="${name} LED ${k + 1} on">▶</button></div>`; }).join('');
     box.appendChild(d);
   });
 }
-$('spotsEd').addEventListener('change', (e) => { if (e.target.dataset.spot !== undefined) spots[+e.target.dataset.spot] = Math.round(+e.target.value); });
-$('spotsSend').addEventListener('click', () => { send('spots ' + spots.join(' ')); toast('Spots sent - Save to orb to keep them'); });
-$('showSpots').addEventListener('click', () => { send('spots ' + spots.join(' ')); send('tool column'); });
+function liveSpots() { send('spots ' + spots.join(' ')); send('tool spots'); }
+$('spotsEd').addEventListener('change', (e) => { if (e.target.dataset.spot !== undefined) { spots[+e.target.dataset.spot] = Math.max(0, Math.min(ledCount - 1, Math.round(+e.target.value))); liveSpots(); } });
+$('spotsEd').addEventListener('click', (e) => { const n = e.target.closest('[data-snudge]'); if (!n) return; const j = +n.dataset.snudge; spots[j] = Math.max(0, Math.min(ledCount - 1, spots[j] + +n.dataset.d)); renderSpots(); liveSpots(); });
+$('spotsSend').addEventListener('click', () => { send('spots ' + spots.join(' ')); send('save'); toast('Spots saved on the orb'); });
+$('showSpots').addEventListener('click', liveSpots);
 $('tTurns').addEventListener('click', () => send('tool turns'));
 $('tCol').addEventListener('click', () => send('tool column'));
+$('tSpots').addEventListener('click', () => send('tool spots'));
 $('tOff').addEventListener('click', () => send('tool off'));
 $('logSet').addEventListener('click', () => send($('logMode').value));
 $('logBurst').addEventListener('click', () => send('b'));

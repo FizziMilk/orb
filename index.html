@@ -53,6 +53,13 @@ header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; backg
 .sec.collapsed .chev { transform: rotate(-90deg); }
 .sec.collapsed > :not(:first-child) { display: none !important; }
 .sec.collapsed > .card-head:first-child .grow p { display: none; }
+details.sub { border-top: 1px solid var(--line); padding-top: 12px; }
+details.sub > summary { font: 600 0.95rem var(--body); cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 6px; }
+details.sub > summary::-webkit-details-marker { display: none; }
+details.sub > summary::after { content: '▾'; color: var(--muted); margin-left: auto; transition: transform .15s; }
+details.sub:not([open]) > summary::after { transform: rotate(-90deg); }
+details.sub[open] > summary { margin-bottom: 12px; }
+details.sub > * + * { margin-top: 12px; }
 .gradbar { height: 18px; border-radius: 6px; border: 1px solid var(--line); }
 .allbar { display: flex; align-items: center; gap: 10px; max-width: 760px; margin: 10px auto 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .orb-dot { width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), var(--orb); box-shadow: 0 0 18px var(--orb); flex: none; transition: background .6s, box-shadow .6s; }
@@ -245,7 +252,7 @@ select { width: auto; }
       <div class="rows" id="presetEditor" hidden></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">Complete looks built on the new features. Each starts from clean defaults (power and calibration kept), turns off every effect it isn't about, and sets its own colours and brightness. Nothing is saved until you press Save at the top.</p></div></div>
+      <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">A library of looks and effects found while experimenting, to build presets from. Each starts from clean defaults (power and calibration kept), turns off every effect it isn't about, and sets its own colours and brightness. Tweak it, then keep it with Save to preset.</p></div></div>
       <div class="rows" id="ideaList"></div>
     </div>
     <div class="card">
@@ -262,14 +269,17 @@ select { width: auto; }
       <div class="palscale"><span style="left:0">calm</span><span style="left:50%">bass-led</span><span style="left:75%">peak</span></div>
       <p class="muted small">Tap the bar to add a colour there. Drag a circle to move it, or drag it down off the bar to remove it. Tap a circle to jump to its box.</p>
       <div class="btns"><button id="btnSweep">Sweep on the orb</button></div>
+      <details class="sub" id="subStops"><summary>Colour stops</summary>
       <div class="rows" id="stops"></div>
       <div class="btns"><button class="primary" id="btnSendPal">Done editing</button><span class="muted small" id="palDirty"></span></div>
-      <div class="card-head" style="border-top:1px solid var(--line);padding-top:14px"><div class="grow"><h3>Gradient</h3><p class="muted small">Different colours from the bottom of the orb to the top.</p></div>
-        <div class="seg" id="gradSeg"><button data-g="0">One colour</button><button data-g="1">Palette</button><button data-g="3">Scheme</button><button data-g="2">Fixed</button></div></div>
+      </details>
+      <details class="sub" id="subGrad"><summary>Gradient <span class="muted small" id="gradSum"></span></summary>
+      <p class="muted small">Different colours from the bottom of the orb to the top.</p>
+        <div class="seg" id="gradSeg"><button data-g="0">One colour</button><button data-g="1">Palette</button><button data-g="3">Scheme</button><button data-g="2">Fixed</button></div>
       <div class="rows" id="gradBody">
         <p class="muted small" id="gradSrcDesc"></p>
-        <div class="rows" id="gradLooks"><h3>Looks</h3><p class="muted small">Starting points: each sets the colours, zones and balance in one tap.</p>
-          <div class="btns" id="looksBtns"></div></div>
+        <details class="sub" id="subLooks"><summary>Looks</summary><p class="muted small">Starting points: each sets the colours, zones and balance in one tap.</p>
+          <div class="btns" id="looksBtns"></div></details>
         <div class="seg" id="schemeSeg" data-key="gscheme"><button data-v="0">Smooth</button><button data-v="1">Contrast</button><button data-v="2">Triad</button></div>
         <div class="gradbar" id="gradBar" aria-hidden="true"></div>
         <div class="fx-row" style="border-top:0"><label class="switch"><input type="checkbox" id="gradHold" aria-label="Hold steady"><span></span></label>
@@ -278,12 +288,13 @@ select { width: auto; }
         <div class="rows" id="gradPal"></div>
         <div class="rows" id="gradFix"></div>
         <div id="gradBalRow"></div>
-        <h3 id="gradBrHead">Brightness per turn</h3>
-        <div class="rows" id="gradBr"></div>
+        <details class="sub" id="gradBrHead"><summary>Brightness per turn</summary>
+        <div class="rows" id="gradBr"></div></details>
         <div class="fx-row" id="bandsRow"><label class="switch"><input type="checkbox" id="bandsOn" aria-label="Bands"><span></span></label>
           <div class="grow"><h3>Bands</h3><p class="muted small">Each turn flickers with its own sound: bass at the bottom, then low-mids, mids, and highs at the face.</p></div></div>
         <div class="rows" id="gradBand"></div>
       </div>
+      </details>
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>Background glow</h2><p class="muted small">Holds the whole orb at one colour while the effects keep running, so you can see how they read on it.</p></div>
@@ -429,6 +440,7 @@ const TURNS = ['Bottom', 'Lower', 'Upper', 'Top'];
 const GRAD_PAL = [ S('gradspread', 'Spread', 0, 1.5, 0.05, { fmt: v => v.toFixed(2), hint: 'How far along the palette the top is from the bottom. 0 = one colour.' }) ];
 const GRAD_FIX = [3, 2, 1, 0].flatMap(k => [ S('gh' + k, TURNS[k] + ' colour', 0, 255, 1, { hue: true }), S('gs' + k, TURNS[k] + ' saturation', 0, 255, 1) ]);
 const GRAD_BR = [3, 2, 1, 0].map(k => S('gb' + k, TURNS[k], 0, 1, 0.05, { fmt: pct }));
+const ZONE_SCALE = S('zscale', 'Zone brightness', 0.25, 4, 0.05, { fmt: v => '×' + v.toFixed(2), hint: 'Scales all four ceilings together, keeping their balance. Raise it until the bass hits stop looking like a change, then back off.' });
 const ZONE_CAPS = [3, 2, 1, 0].map(k => S('zc' + k, ['Bottom (background)', 'Lower', 'Upper', 'Face'][k] + ' ceiling', 0.02, 1, 0.01, { fmt: pct }));
 const GRAD_BAND = [ S('bandmin', 'Quiet turn keeps', 0, 1, 0.05, { fmt: pct, hint: 'Light left on a turn whose band is quiet.' }) ];
 const FX = [
@@ -491,7 +503,9 @@ const FX_CARDS = [
 ];
 const FEEL_DIPS = [
   S('dipdepth', 'Dip depth', 0, 0.95, 0.05, { fmt: pct }),
-  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms' }),
+  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms', hint: 'Used when Recovery follows the tempo is off.' }),
+  S('relbeats', 'Recovery follows the tempo', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '% of a beat (' + Math.round(v * 60000 / 165) + ' ms at 165, ' + Math.round(v * 60000 / 110) + ' ms at 110 BPM)', hint: 'Recovery as a share of each beat, so fast and slow songs both feel right.' }),
+  S('depthslow', 'Shallower for slow music', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : 'up to ' + Math.round(v * 50) + '% less at 100 BPM', hint: 'Full depth from 140 BPM up; below that the dips get gentler.' }),
   S('kickdb', 'Kick sensitivity', 3, 12, 0.5, { ui: v => 15 - v, back: v => 15 - v, uiMin: 3, uiMax: 12, fmt: v => (15 - v).toFixed(1), hint: 'Higher = quieter kicks count.' }),
 ];
 const FEEL_SING = [
@@ -654,7 +668,8 @@ function renderAll() {
   const g = vals.grad == 1, src = +(vals.gradsrc ?? 0), drv = +(vals.gdrive ?? 0), gsel = g ? [1, 2, 3][src] : 0;
   document.querySelectorAll('#gradSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.g === gsel)));
   $('gradPal').hidden = !g || src !== 0; $('gradFix').hidden = !g || src !== 1;
-  $('gradBr').hidden = !g; $('gradBrHead').hidden = !g; $('bandsRow').hidden = !g;
+  $('gradBrHead').hidden = !g;
+  $('gradSum').textContent = '· ' + ['one colour', 'palette', 'fixed', 'scheme'][g ? [1, 2, 3][src] : 0]; $('bandsRow').hidden = !g;
   $('gradSrcDesc').textContent = !g ? 'The whole orb in the glow colour, as usual.' : src === 0 ? 'Each turn takes a colour from the palette around the current glow colour, so it slides with the music.' : src === 2 ? 'Colours worked out from the glow colour, so they follow the music: Smooth = neighbouring colours, Contrast = the face in the opposite colour, Triad = three colours evenly apart.' : 'Your own colour for each turn.';
   $('schemeSeg').hidden = !g || src !== 2; $('gradBalRow').hidden = !g;
   $('gradBar').hidden = !g || src !== 1;
@@ -710,6 +725,7 @@ GRAD_BAND.forEach(d => $('gradBand').appendChild(slider(d)));
 $('heightToggles').appendChild(toggle('volfill', 'Volume fills the orb', 'Quiet parts light only the bottom, loud parts reach all the way to the face.', null));
 $('heightToggles').appendChild(toggle('gbuild', 'Build-ups climb', 'As a build-up gets more intense, the light climbs to the face.', null));
 $('heightToggles').appendChild(toggle('zones', 'Keep the zones separate', 'Each turn stays below its ceiling, so the areas of the ball keep their own colour instead of washing together.', null));
+$('zoneCaps').appendChild(slider(ZONE_SCALE));
 ZONE_CAPS.forEach(d => $('zoneCaps').appendChild(slider(d)));
 document.querySelectorAll('#gradSeg button').forEach(b => b.addEventListener('click', () => {
   const g = +b.dataset.g; vals.grad = g ? 1 : 0; send('set grad ' + vals.grad);
@@ -767,6 +783,7 @@ $('gradFix').appendChild(slider(S('gspin', 'Colours travel', 0, 120, 1, { fmt: v
 // Ideas to try: full recipes on top of the defaults (see the Orb Feature Guide)
 const FX_OFF = Object.fromEntries(ALL_FX.map(k => [k, 0]));
 const IDEAS = [
+  ['Pearl pulse', 'Found 2 Oct: a blue-ish orb that fills with orange, green and a pink-red face on each bass note. Soft, pearly mixing rather than hard bands.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, grad: 1, gradsrc: 1, gh0: 160, gh1: 32, gh2: 96, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 0, gheat: 0, gbal: 0, bassh: 1, pump: 1, volfill: 0, zones: 1, zc0: 0.14, zc1: 0.28, zc2: 0.05, zc3: 0.2, dipdepth: 0.7, diprelease: 90 }],
   ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter. The face is the opposite colour, so you see when the light reaches it.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Contrast'], bassh: 1, pump: 1, volfill: 1, dipdepth: 0.6, bright: 150 }],
   ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7, bright: 110 }],
   ['Spotlight dancer', 'A dim warm ball where a white dancer and the sparks do the work. Best in a dark room.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30, col_eye: 2, hue_eye: 0, sat_eye: 0, bright: 140 }, 'Ember'],
@@ -791,6 +808,10 @@ IDEAS.forEach(idea => {
   $('ideaList').appendChild(row);
 });
 
+document.querySelectorAll('details.sub[id]').forEach(d => {
+  try { const v = JSON.parse(localStorage.getItem('orbSubs') || '{}')[d.id]; if (v !== undefined) d.open = v; } catch (e) {}
+  d.addEventListener('toggle', () => { try { const o = JSON.parse(localStorage.getItem('orbSubs') || '{}'); o[d.id] = d.open; localStorage.setItem('orbSubs', JSON.stringify(o)); } catch (e) {} });
+});
 // Every card is a section that folds away; tap its title. Remembered per phone.
 const OPEN_BY_DEFAULT = new Set(['tab-home:Mode', 'tab-home:Presets', 'tab-colours:Palette', 'tab-feel:Bass pulse', 'tab-setup:Global']);
 (function makeSections() {
@@ -842,7 +863,11 @@ let presetEditing = false, presetCopying = false, presetSel = -1;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function slotView(k) {
   const s = slots[k];
-  if (s) return { name: s.name, desc: s.desc, bar: s.mode === 1 ? css(s.lh, s.ls) : gradient(s.pal.length > 1 ? s.pal : PAL_PRESETS['Club Light']), saved: !s.orig };
+  if (s) {
+    const fixed = s.mode !== 1 && s.gr && s.gr.on && s.gr.src === 1;   // fixed gradient: show its four turn colours
+    const bar = s.mode === 1 ? css(s.lh, s.ls) : fixed ? `linear-gradient(90deg, ${s.gr.h.map((h, i) => css(h, s.gr.s[i])).join(', ')})` : gradient(s.pal.length > 1 ? s.pal : PAL_PRESETS['Club Light']);
+    return { name: s.name, desc: s.desc, bar, saved: !s.orig };
+  }
   if (k < BUILTIN_NAMES.length) {
     const n = BUILTIN_NAMES[k], p = BUILTIN[n];
     return { name: n, desc: p.desc, bar: gradient(builtinPal(p)) };
@@ -1097,7 +1122,7 @@ function renderPalette() {
 function palChanged() { palDirty = true; sendSoon(palLine(), 'pal'); }
 function selectStop(i, scroll) {
   palSel = i; renderPalette();
-  if (scroll) $('stop' + i)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (scroll) { $('subStops').open = true; $('stop' + i)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 $('stops').addEventListener('input', (e) => {
   const m = e.target.id.match(/^p([hs])(\d+)$/); if (!m) return;
@@ -1296,7 +1321,8 @@ function onLine(line) {
       if (f[2] === '1' && f.length >= 7) {
         const [md, lh, ls] = f[5].trim().split(/\s+/).map(Number), pw = f[6].trim().split(/\s+/).map(Number), pl = [];
         for (let i = 0; i < pw[0]; i++) pl.push([pw[1 + 3 * i], pw[2 + 3 * i], pw[3 + 3 * i]]);
-        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl, orig: f[7] === '1' };
+        const gw = (f[8] || '').trim().split(/\s+/).map(Number);            // grad src h0..h3 s0..s3 (newer sketches)
+        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl, orig: f[7] === '1', gr: gw.length >= 10 ? { on: gw[0] === 1, src: gw[1], h: gw.slice(2, 6), s: gw.slice(6, 10) } : null };
       } else slots[k] = null;
       slotSeen.add(k); renderPresets(); updateSaveBtn(); maybeInstall();
     }
@@ -1468,7 +1494,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
-  gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
+  relbeats: 0, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
   gdrive: 0, revrange: 12, revmin: 0.25, revrel: 250, bandmin: 0.2, gbuild: 1, lampgrad: 0, lamphue2: 200, lampsat2: 200,
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,
@@ -1488,7 +1514,7 @@ function startDemo() {
     else if (w[0] === 'pal') { const n = +w[1]; demoPal = []; for (let i = 0; i < n; i++) demoPal.push([+w[2 + 3 * i], +w[3 + 3 * i], +w[4 + 3 * i]]); }
     else if (w[0] === 'pinfo') { for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`); reply('cur -1'); }
     else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
-      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}|${['grad', 'gradsrc', 'gh0', 'gh1', 'gh2', 'gh3', 'gs0', 'gs1', 'gs2', 'gs3'].map(k => Math.round(st[k] ?? 0)).join(' ')}`; reply('ok psave ' + k); reply(demoSlots[k]); }
     else if (w[0] === 'pname') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|'); if (demoSlots[k]) { const f = demoSlots[k].split('|'); f[3] = nd[0]; f[4] = nd[1] || ''; f[7] = '0'; demoSlots[k] = f.join('|'); reply('ok pname ' + k); reply(demoSlots[k]); } }
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }

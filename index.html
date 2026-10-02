@@ -40,15 +40,22 @@ p { margin: 0; }
 
 /* Header */
 header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 14px 10px; border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 16px; }
-.head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: 760px; margin: 0 auto; }
+.head-row { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; max-width: 760px; margin: 0 auto; }
+.head-row .grow { min-width: 0; }
+#connState { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Fixed layout so loading never makes the bar jump: one row of actions, two fixed rows of chips */
+.actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; max-width: 760px; margin: 10px auto 0; }
+.actions button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.allbar { display: flex; align-items: center; gap: 10px; max-width: 760px; margin: 10px auto 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .orb-dot { width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), var(--orb); box-shadow: 0 0 18px var(--orb); flex: none; transition: background .6s, box-shadow .6s; }
 .grow { flex: 1 1 auto; min-width: 0; }
-.live { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; max-width: 760px; margin-inline: auto; }
+.live { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; max-width: 760px; margin-inline: auto; }
+.live .chip { justify-content: center; min-width: 0; white-space: nowrap; overflow: hidden; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font: 500 0.8rem/1.3 var(--mono); font-variant-numeric: tabular-nums; }
 .chip b { font-weight: 600; color: var(--fg); }
 .chip.on { border-color: var(--accent); }
-.heat { width: 64px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
-.heat i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7a5cff, #e0673f); background-size: 64px 100%; background-repeat: no-repeat; transition: width .4s; }  /* shows the palette */
+.heat { width: 100%; min-width: 24px; flex: 1; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.heat i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7a5cff, #e0673f); background-repeat: no-repeat; transition: width .4s; }  /* shows the palette */
 .sec-calm { color: #8fb3ff; } .sec-build { color: #f2d15c; } .sec-groove { color: #6fcf97; } .sec-drop { color: #ff7a59; } .sec-silent { color: var(--muted); }
 
 /* Buttons */
@@ -120,8 +127,10 @@ input[type=range].hue::-moz-range-thumb { width: 18px; height: 18px; border-radi
 .presets { display: flex; gap: 8px; flex-wrap: wrap; }
 .preset { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); cursor: pointer; min-width: 120px; flex: 1 1 120px; text-align: left; font: inherit; color: inherit; }
 .preset .pbar { height: 10px; border-radius: 5px; }
-.remote-map { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 8px 0; }
-.remote-map td { border: 1px solid var(--line); padding: 6px; vertical-align: top; }
+#remoteSvg { width: 100%; max-width: 460px; display: block; margin: 8px auto 0; }
+#remoteSvg .lbl { font: 600 11px var(--body); fill: var(--fg); dominant-baseline: middle; }
+#remoteSvg .lbl.fx { fill: #f2d15c; }
+#remoteSvg .ln { stroke: #f2d15c; stroke-width: 1.2; fill: none; }
 details summary { cursor: pointer; }
 /* Presets: 3 columns, like the remote's colour buttons */
 #builtinPresets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -132,6 +141,8 @@ details summary { cursor: pointer; }
 .tcols input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; vertical-align: middle; }
 .numrow.rowcal { flex-wrap: nowrap; gap: 6px; padding: 4px 6px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
 .rowcal.sel { border-color: #3a8bff; background: color-mix(in srgb, #3a8bff 12%, transparent); }
+.preset.pick { outline: 2px dashed var(--accent); outline-offset: 1px; }
+#copyHint { color: var(--accent); margin: 0 0 8px; }
 .preset.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
 .preset:disabled { opacity: .5; cursor: default; }
 
@@ -170,9 +181,12 @@ select { width: auto; }
       <p class="muted small" id="connState">Not connected</p>
     </div>
     <button id="btnConnect" class="primary">Connect</button>
-    <button id="btnSave" disabled title="Keep the current settings after a restart">Save to orb</button>
-    <button id="btnRevert" class="ghost" disabled title="Go back to the last saved settings">Undo changes</button>
   </div>
+  <div class="actions">
+    <button id="btnSave" disabled title="Keep the current settings after a restart">Save to orb</button>
+    <button id="btnRevert" class="ghost" disabled title="Go back to the last saved settings">Undo</button>
+  </div>
+  <div class="allbar" id="allBar" hidden><span class="grow small"><b>Editing all presets:</b> slider changes go to every preset.</span><button class="small" id="allDone">Done</button></div>
   <div class="live" aria-live="polite">
     <span class="chip"><b id="stBpm">–</b> BPM</span>
     <span class="chip">section: <b id="stSec" class="sec-silent">–</b></span>
@@ -217,12 +231,13 @@ select { width: auto; }
       <div class="rows" id="homeCtl"></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Presets</h2><p class="muted small">Tap a look to use it. To change it, adjust anything on any tab, then press Save to … at the top. Rename / reset is for names, saving into another slot, or going back to the built-in.</p></div><button class="small" id="presetEdit" aria-pressed="false">Rename / reset</button></div>
+      <div class="card-head"><div class="grow"><h2>Presets</h2><p class="muted small">Press Save at the top to store changes in the current preset.</p></div><div class="numrow"><button class="small" id="presetCopy" aria-pressed="false">Save to preset</button><button class="small" id="presetEdit" aria-pressed="false">Rename / reset</button><button class="small" id="presetAll" aria-pressed="false">Edit all</button></div></div>
+      <p class="small" id="copyHint" hidden>Tap the preset to save the current look into.</p>
       <div class="presets" id="builtinPresets"></div>
       <div class="rows" id="presetEditor" hidden></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Effects on / off</h2><p class="muted small">Try fires an effect now, whatever the music is doing.</p></div></div>
+      <div class="card-head"><div class="grow"><h2>Effects on / off</h2></div></div>
       <div id="fxList"></div>
     </div>
   </section>
@@ -267,28 +282,16 @@ select { width: auto; }
   <section class="tab" id="tab-feel" role="tabpanel" hidden>
     <div class="card"><h2>Bass dips</h2><div class="rows" id="feelDips"></div></div>
     <div class="card"><h2>Quiet and singing parts</h2><div class="rows" id="feelSing"></div></div>
-    <div class="card"><h2>Glow</h2><div class="rows" id="feelGlow"></div></div>
   </section>
 
   <!-- SETUP -->
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
-    <div class="card"><h2>Power</h2><p class="muted small">The same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
+    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
       <details><summary><h2 style="display:inline">Remote</h2> <span class="muted small">Mr.Go button map</span></summary>
-      <table class="remote-map">
-        <tr><td>☀ + / −</td><td>brightness</td><td>OFF / ON</td><td>lights off / on</td></tr>
-        <tr><td>R G B W</td><td colspan="3">lamp in red, green, blue, warm white</td></tr>
-        <tr><td>FLASH</td><td>white flash</td><td>STROBE</td><td>half a bar of strobe</td></tr>
-        <tr><td>FADE</td><td>sensitivity</td><td>SMOOTH</td><td>colour buttons: presets ↔ effects</td></tr>
-      </table>
-      <p class="muted small">Colour buttons, row by row (preset / effect):</p>
-      <table class="remote-map">
-        <tr><td>Ember / spin</td><td>Aurora / ripple</td><td>Neon / flood</td></tr>
-        <tr><td>Sunset Drive / clap</td><td>Warehouse / hats</td><td>Club Light / sparkles</td></tr>
-        <tr><td>Disco / snare roll</td><td>Deep Sea / dancer</td><td>Velvet / party jump</td></tr>
-        <tr><td>Acid / blackout</td><td>Chill / palette sweep</td><td>Bubblegum / slingshot</td></tr>
-      </table>
-      <p class="muted small">Blackout stays dark until the next kick. Switching to effects sparkles once; back to presets sweeps the palette.</p>
+      <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
+      <svg id="remoteSvg" viewBox="-14 0 388 362" role="img" aria-label="Mr.Go remote button guide"></svg>
+      <p class="muted small">SMOOTH switches the colour buttons between presets and effects. In lamp mode, the brightness buttons change the lamp brightness. Blackout stays dark until the next kick.</p>
       </details>
     </div>
     <div class="card">
@@ -447,21 +450,17 @@ const FEEL_SING = [
   S('singmin', 'Singing: quietest point', 0, 1, 0.05, { fmt: pct }),
   S('singceil', 'Singing: brightest point', 0.2, 1, 0.05, { fmt: pct, hint: 'Keeps calm parts below the drops.' }),
   S('singdrift', 'Melody colour drift', 0, 0.3, 0.01, { fmt: v => v.toFixed(2) }),
-  S('floor', 'Always-on floor', 0, 0.3, 0.01, { fmt: pct, hint: 'Minimum light while music plays. 0 lets quiet parts go dark.' }),
   S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { fmt: pct }),
 ];
-const FEEL_GLOW = [
-  S('sparse', 'Dim-glow smoothing', 0, 6, 1, { fmt: v => v < 2 ? 'off' : 'every ' + v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' LED', hint: 'At low light only every few LEDs carry it: smoother, less flicker.' }),
-];
 const POWER = [                                        // global: the same for every preset, saved on the orb straight away
+  S('floor', 'Always-on floor', 0, 0.3, 0.01, { fmt: pct, hint: 'Minimum light while music plays. 0 lets quiet parts go dark.' }),
+  S('sparse', 'Dim-glow smoothing', 0, 6, 1, { fmt: v => v < 2 ? 'off' : 'every ' + v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' LED', hint: 'At low light only every few LEDs carry it: smoother, less flicker.' }),
   S('ledma', 'Total power', 150, 750, 10, { fmt: v => v + ' mA', hint: 'For the LEDs. Capped at 750 mA: the board carries about 1 A and the ESP32 uses the rest.' }),
   S('fxshare', 'Kept for effects', 0.1, 0.7, 0.01, { fmt: v => Math.round(v * 100) + '% · glow gets ' + Math.round((vals.ledma || 480) * (1 - v)) + ' mA', hint: 'The glow can never use this share, so effects always have room to show in loud parts.' }),
 ];
 
 const PAL_PRESETS = {
   'Club Light': [[0, 128, 255], [0.25, 160, 255], [0.37, 175, 255], [0.5, 192, 255], [0.75, 200, 255], [0.85, 232, 140], [1, 258, 215], [1.25, 276, 255], [1.5, 264, 255]],
-  'Molten': [[0, 128, 255], [0.25, 160, 255], [0.5, 192, 255], [0.62, 205, 255], [0.72, 250, 255], [0.95, 255, 255], [1.25, 268, 255]],
-  'Deep Blue': [[0, 150, 255], [0.35, 168, 255], [0.7, 192, 255], [1, 218, 235], [1.3, 236, 255]],
   'Sunset': [[0, 200, 255], [0.4, 225, 230], [0.8, 245, 255], [1.1, 262, 255], [1.4, 276, 255]],
   'Ember': [[0, 248, 255], [0.4, 260, 255], [0.8, 274, 255], [1.1, 284, 240], [1.4, 294, 215]],
   'Neon': [[0, 196, 255], [0.35, 212, 255], [0.7, 226, 255], [1.05, 238, 255], [1.15, 340, 255], [1.5, 352, 255]],
@@ -478,38 +477,38 @@ const ALL_FX = FX.map(f => f[0]);
 // Built-in looks, in the remote's colour-button order (slot 0 = row 3 left ... slot 11 = row 6 right).
 // The app installs each into its slot on the orb, so the remote can pick them.
 const BUILTIN = {
-  'Ember': { set: { mode: 0, floor: 0, ...fxOn(['fx_flood', 'fx_hats', 'fx_party']), coloursmooth: 0.0012, wobble: 0.02, idlehue: 10,
+  'Ember': { set: { mode: 0, ...fxOn(['fx_flood', 'fx_hats', 'fx_party']), coloursmooth: 0.0012, wobble: 0.02, idlehue: 10,
       col_clap: 3, col_spark: 3, col_spin: 3 },
     pal: 'Ember', desc: 'Warm and slow: red to gold, sparks swap red and orange.' },
-  'Aurora': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0015, wobble: 0.08, pastel: 120, dipdepth: 0.4, idlehue: 105,
+  'Aurora': { set: { mode: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0015, wobble: 0.08, pastel: 120, dipdepth: 0.4, idlehue: 105,
       partyrange: 9, partychance: 0.3, partyhold: 32, col_clap: 3, col_spark: 3, col_spin: 3, col_ripple: 3 },
     pal: 'Aurora', desc: 'Northern lights: green to violet, drifting.' },
-  'Neon': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, partyrange: 2, partychance: 0.8, partyhold: 16, idlehue: 200,
+  'Neon': { set: { mode: 0, ...fxOn(), coloursmooth: 0.005, partyrange: 2, partychance: 0.8, partyhold: 16, idlehue: 200,
       col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_hat: 1, shift_hat: 128, sat_hat: 200,
       col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128, sat_spin: 230 },
     pal: 'Neon', desc: 'Loud: violet and pink, acid green at the peak.' },
-  'Sunset Drive': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.0018, sling: 0.5, spinbeats: 4, spinturns: 1, spindim: 0.5, idlehue: 200 },
+  'Sunset Drive': { set: { mode: 0, ...fxOn(), coloursmooth: 0.0018, sling: 0.5, spinbeats: 4, spinturns: 1, spindim: 0.5, idlehue: 200 },
     pal: 'Sunset', desc: 'Purple dusk to orange, long lazy spins.' },
-  'Warehouse': { set: { mode: 0, floor: 0, ...fxOn(['fx_party']), dipdepth: 0.95, diprelease: 40, warmth: 0.3, moodscale: 0.4, hats: 2,
+  'Warehouse': { set: { mode: 0, ...fxOn(['fx_party']), dipdepth: 0.95, diprelease: 40, warmth: 0.3, moodscale: 0.4, hats: 2,
       spinbeats: 1, spinturns: 2, spingain: 10, spindim: 1, idlehue: 150,
       col_eye: 2, hue_eye: 0, sat_eye: 255, col_clap: 2, sat_clap: 0, col_spark: 2, sat_spark: 0, col_hat: 2, sat_hat: 0, col_spin: 2, sat_spin: 0 },
     pal: 'Warehouse', desc: 'Techno: cold white, hard kick punches, red eye.' },
-  'Club Light': { set: { mode: 0, floor: 0, ...fxOn() }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
-  'Disco': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.0018, partyrange: 1, hats: 3, hatgain: 6, sparkgain: 9, idlehue: 32,
+  'Club Light': { set: { mode: 0, ...fxOn() }, pal: 'Club Light', desc: 'Everything on, dark-room glow.' },
+  'Disco': { set: { mode: 0, ...fxOn(), coloursmooth: 0.0018, partyrange: 1, hats: 3, hatgain: 6, sparkgain: 9, idlehue: 32,
       spinbeats: 6, spinturns: 1.5, spindim: 0.4,
       col_clap: 2, hue_clap: 36, sat_clap: 80, col_spark: 2, hue_spark: 36, sat_spark: 60, col_hat: 2, hue_hat: 36, sat_hat: 40, col_spin: 2, hue_spin: 36, sat_spin: 50 },
     pal: 'Disco', desc: 'Mirror ball: amber and gold, lots of glitter.' },
-  'Deep Sea': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), idlehue: 150, clapgain: 3.5, sparkgain: 4.5, spingain: 6, ripplegain: 3,
+  'Deep Sea': { set: { mode: 0, ...fxOn(['fx_hats']), idlehue: 150, clapgain: 3.5, sparkgain: 4.5, spingain: 6, ripplegain: 3,
       col_eye: 2, hue_eye: 4, sat_eye: 190, col_clap: 2, hue_clap: 4, sat_clap: 200, col_spark: 2, hue_spark: 4, sat_spark: 200, col_spin: 2, hue_spin: 4, sat_spin: 190 },
     pal: 'Deep Sea', desc: 'Cool and moody: navy to ice, coral eye.' },
-  'Velvet': { set: { mode: 0, floor: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0012, dipdepth: 0.5, idlehue: 190,
+  'Velvet': { set: { mode: 0, ...fxOn(['fx_hats']), coloursmooth: 0.0012, dipdepth: 0.5, idlehue: 190,
       col_eye: 2, hue_eye: 200, sat_eye: 40, col_clap: 1, shift_clap: 32, sat_clap: 200, col_spark: 1, shift_spark: 32, sat_spark: 200, col_spin: 1, shift_spin: 32, sat_spin: 180 },
     pal: 'Velvet', desc: 'Slow and heavy: indigo to magenta, warm pink sparks.' },
-  'Acid': { set: { mode: 0, floor: 0, ...fxOn(), coloursmooth: 0.005, dipdepth: 0.85, diprelease: 60, partyrange: 2, idlehue: 64,
+  'Acid': { set: { mode: 0, ...fxOn(), coloursmooth: 0.005, dipdepth: 0.85, diprelease: 60, partyrange: 2, idlehue: 64,
       col_eye: 1, shift_eye: 128, sat_eye: 255, col_clap: 1, shift_clap: 128, col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128 },
     pal: 'Acid', desc: 'Acid house: yellow to lime, violet sparks, deep kicks.' },
-  'Chill': { set: { mode: 0, floor: 0.03, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
-  'Bubblegum': { set: { mode: 0, floor: 0.04, ...fxOn(), pastel: 200, partyrange: 2, idlehue: 222,
+  'Chill': { set: { mode: 0, ...Object.fromEntries(ALL_FX.map(k => [k, 0])) }, pal: null, desc: 'Follows the music softly, no effects.' },
+  'Bubblegum': { set: { mode: 0, ...fxOn(), pastel: 200, partyrange: 2, idlehue: 222,
       col_clap: 1, shift_clap: 128, sat_clap: 150, col_spark: 1, shift_spark: 128, sat_spark: 120, col_hat: 1, shift_hat: 128, sat_hat: 110 },
     pal: 'Bubblegum', desc: 'Pastel pink and aqua, soft and playful.' },
 };
@@ -540,7 +539,8 @@ function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toas
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 let activeSlot = -1, dirty = false, quietSend = false;   // the preset the orb is on, and unsaved changes to it
-const DEVICE_KEYS = ['ledma', 'fxshare'];
+const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse'];
+let editAll = false;                                   // 'Edit all presets' mode
 function updateSaveBtn() {
   const b = $('btnSave'), s = activeSlot >= 0 ? slots[activeSlot] : null;
   b.textContent = s ? 'Save to ' + s.name : 'Save to orb';
@@ -549,7 +549,11 @@ function updateSaveBtn() {
 function send(line) {
   if (!quietSend) {
     const m = /^set (\S+)/.exec(line);
-    if (m && DEVICE_KEYS.includes(m[1])) sendTimers.psave = (clearTimeout(sendTimers.psave), setTimeout(() => link && link.send('save'), 1500));   // power: kept right away
+    if (m && DEVICE_KEYS.includes(m[1])) sendTimers.psave = (clearTimeout(sendTimers.psave), setTimeout(() => link && link.send('save'), 1500));   // global: kept right away
+    else if (m && editAll) {                           // 'Edit all': the orb writes it into every preset once the slider settles
+      const key = m[1], val = line.split(' ')[2], t = 'all_' + key;
+      clearTimeout(sendTimers[t]); sendTimers[t] = setTimeout(() => link && link.send(`pall ${key} ${val}`), 800);
+    }
     else if (m || /^pal /.test(line)) { dirty = true; updateSaveBtn(); }
   }
   if (line === 'tool off' || /^tool (find|nb|turns|column|stop|sweep)/.test(line)) { const b = document.getElementById('bgOn'); if (b) b.checked = false; }
@@ -642,7 +646,6 @@ COLOUR.forEach(d => $('colourCtl').appendChild(slider(d)));
 PARTY.forEach(d => $('partyCtl').appendChild(slider(d)));
 FEEL_DIPS.forEach(d => $('feelDips').appendChild(slider(d)));
 FEEL_SING.forEach(d => $('feelSing').appendChild(slider(d)));
-FEEL_GLOW.forEach(d => $('feelGlow').appendChild(slider(d)));
 POWER.forEach(d => $('powerBox').appendChild(slider(d)));
 FX_CARDS.forEach(c => {
   const card = document.createElement('div'); card.className = 'card';
@@ -658,6 +661,7 @@ FX_CARDS.forEach(c => {
 });
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-trig]'); if (b) { send('t ' + b.dataset.trig); toast('Fired: ' + b.dataset.trig); } });
 
+addEventListener('resize', () => { const h = $('stHeat'); h.style.backgroundSize = (h.parentElement.clientWidth || 64) + 'px 100%'; });
 // Tabs
 document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
@@ -676,7 +680,7 @@ const BUILTIN_NAMES = Object.keys(BUILTIN);
 const NSLOTS = 12;
 let slots = Array(NSLOTS).fill(null);          // null = nothing saved on the orb; else { name, desc, mode, lh, ls, pal, orig }
 let slotSeen = new Set(), installDone = false;  // (install once per connection, after all slot infos arrived)
-let presetEditing = false, presetSel = -1;
+let presetEditing = false, presetCopying = false, presetSel = -1;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function slotView(k) {
   const s = slots[k];
@@ -687,22 +691,82 @@ function slotView(k) {
   }
   return { name: 'Empty slot', desc: 'Edit to save the current look here.', bar: 'var(--line)', empty: true };
 }
+// Remote guide: a drawing of the Mr.Go remote with a line from each button to what it does
+const REMOTE_FX = ['Spin', 'Ripple', 'Flood', 'Clap', 'Hats', 'Sparkles', 'Snare roll', 'Dancer', 'Party jump', 'Blackout', 'Palette sweep', 'Slingshot'];
+const REMOTE_COL = ['#f0482a', '#3fe0b0', '#1e78e0', '#ff6a1a', '#3cc8f0', '#1c1f4a', '#ff9a2a', '#2aa0a0', '#4a1c4a', '#ffe028', '#1e6a9a', '#a050b0'];
+let remoteFx = false;
+function renderRemote() {
+  const svg = $('remoteSvg'); if (!svg) return;
+  const CX = [132, 164, 196, 228], CY = [104, 144, 188, 232, 276, 320], R = 12, L = 98, RT = 262;
+  const cut = t => t.length > 15 ? t.slice(0, 14) + '…' : t;
+  let o = '<rect x="110" y="56" width="140" height="290" rx="14" fill="#050507" stroke="#4a4458" stroke-width="2"/>'
+    + '<text x="180" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" letter-spacing="1">mr.go</text>';
+  const ln = d => o += `<path class="ln" d="${d}"/>`;
+  const lb = (x, y, t, end, fx) => o += `<text class="lbl${fx ? ' fx' : ''}" x="${x}" y="${y}" text-anchor="${end ? 'end' : 'start'}">${esc(t)}</text>`;
+  const btn = (x, y, fill, txt, tcol, fs, stroke) => {
+    o += `<circle cx="${x}" cy="${y}" r="${R}" fill="${fill}"${stroke ? ' stroke="#fff" stroke-width="1.2"' : ''}/>`;
+    if (txt) o += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="800" fill="${tcol}">${txt}</text>`;
+  };
+  const sun = (x, y, up) => {
+    btn(x, y + 0, '#f4f4f4');
+    o += `<circle cx="${x}" cy="${y + (up ? 2 : -2)}" r="2.6" fill="#111"/>`;
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, cy = y + (up ? 2 : -2);
+      o += `<line x1="${x + Math.cos(a) * 4}" y1="${cy + Math.sin(a) * 4}" x2="${x + Math.cos(a) * 5.8}" y2="${cy + Math.sin(a) * 5.8}" stroke="#111" stroke-width="1"/>`; }
+    o += up ? `<path d="M${x - 4},${y - 5} L${x},${y - 8.5} L${x + 4},${y - 5}" stroke="#111" stroke-width="1.2" fill="none"/>`
+            : `<path d="M${x - 4},${y + 5} L${x},${y + 8.5} L${x + 4},${y + 5}" stroke="#111" stroke-width="1.2" fill="none"/>`;
+  };
+  // top row: lines go up
+  ln(`M132,92 V44 H${L + 2}`); lb(L, 44, 'Brighter', 1);
+  ln(`M164,92 V26 H${L + 2}`); lb(L, 26, 'Dimmer', 1);
+  ln(`M196,92 V26 H${RT - 2}`); lb(RT, 26, 'Off', 0);
+  ln(`M228,92 V44 H${RT - 2}`); lb(RT, 44, 'On', 0);
+  // every other row: column 1 left, column 2 left via the gap above, column 3 right via the gap, column 4 right
+  const rows = [['Lamp red', 'Lamp green', 'Lamp blue', 'Lamp warm white']];
+  for (let r = 0; r < 4; r++) {
+    const names = [0, 1, 2].map(c => { const k = r * 3 + c; return remoteFx ? REMOTE_FX[k] : slotView(k).name; });
+    rows.push([...names, ['White flash', 'Strobe ½ bar', 'Sensitivity', 'Presets ↔ FX'][r]]);
+  }
+  rows.forEach((t, i) => {
+    const y = CY[i + 1], g = y - 22, fx = remoteFx && i > 0;
+    ln(`M${CX[0] - R},${y} H${L + 2}`); lb(L, y, cut(t[0]), 1, fx);
+    ln(`M${CX[1]},${y - R} V${g} H${L + 2}`); lb(L, g, cut(t[1]), 1, fx);
+    ln(`M${CX[2]},${y - R} V${g} H${RT - 2}`); lb(RT, g, cut(t[2]), 0, fx);
+    ln(`M${CX[3] + R},${y} H${RT - 2}`); lb(RT, y, cut(t[3]), 0);
+  });
+  // buttons on top of the lines
+  sun(132, 104, 1); sun(164, 104, 0);
+  btn(196, 104, '#e23a2e', 'OFF', '#fff', 6); btn(228, 104, '#22a44a', 'ON', '#fff', 6.5);
+  [['#e8231d', 'R', '#111'], ['#1fa64a', 'G', '#111'], ['#1d2a8a', 'B', '#111'], ['#f4f4f4', 'W', '#111']].forEach(([f, t, c], i) => btn(CX[i], 144, f, t, c, 11));
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 3; c++) btn(CX[c], CY[r + 2], REMOTE_COL[r * 3 + c]);
+    btn(CX[3], CY[r + 2], '#050507', ['FLASH', 'STROBE', 'FADE', 'SMOOTH'][r], '#fff', r === 3 || r === 1 ? 4.6 : 5.4, 1);
+  }
+  svg.innerHTML = o;
+}
+document.querySelectorAll('#remoteSeg button').forEach(b => b.addEventListener('click', () => {
+  remoteFx = b.dataset.v === '1';
+  document.querySelectorAll('#remoteSeg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderRemote();
+}));
 function renderPresets() {
+  renderRemote();
   const box = $('builtinPresets'); box.innerHTML = '';
   for (let k = 0; k < NSLOTS; k++) {
     const v = slotView(k), b = document.createElement('button');
     b.className = 'preset' + (presetEditing && k === presetSel ? ' sel' : ''); b.type = 'button'; b.dataset.slot = k;
-    b.disabled = !!v.empty && !presetEditing;
+    b.disabled = !!v.empty && !presetEditing && !presetCopying;
+    if (presetCopying) b.classList.add('pick');
     b.innerHTML = `<span class="pbar" style="background:${v.bar}"></span><b>${esc(v.name)}</b><span class="muted small">${esc(v.desc)}${v.saved ? ' (edited)' : ''}</span>`;
     box.appendChild(b);
   }
   const ed = $('presetEditor'); ed.hidden = !presetEditing;
   if (!presetEditing) return;
-  if (presetSel < 0) { ed.innerHTML = '<p class="muted small">Pick a slot above. Saving stores everything the orb is doing right now (except the Setup calibration).</p>'; return; }
+  if (presetSel < 0) { ed.innerHTML = '<p class="muted small">Tap a preset to rename it or reset it.</p>'; return; }
   const k = presetSel, v = slotView(k);
-  ed.innerHTML = `<label class="small">Name <input type="text" id="peName" maxlength="30" value="${v.empty ? '' : esc(v.name)}" placeholder="My look"></label>
-    <label class="small">Description <input type="text" id="peDesc" maxlength="60" value="${v.empty ? '' : esc(v.desc)}" placeholder="What it's for"></label>
-    <div class="btns"><button class="primary" id="peSave">Save the current look here</button>${slots[k] && !slots[k].orig && k < BUILTIN_NAMES.length ? '<button id="peClear">Reset to built-in</button>' : ''}</div>`;
+  if (!slots[k]) { ed.innerHTML = '<p class="muted small">This preset isn\'t on the orb yet. Connect and it will be added.</p>'; return; }
+  ed.innerHTML = `<label class="small">Name <input type="text" id="peName" maxlength="30" value="${esc(v.name)}"></label>
+    <label class="small">Description <input type="text" id="peDesc" maxlength="60" value="${esc(v.desc)}"></label>
+    <div class="btns"><button class="primary" id="peSave" hidden>Save</button>${!slots[k].orig ? '<button id="peClear">Reset to built-in</button>' : ''}</div>`;
 }
 function applyBuiltin(name) {
   const p = BUILTIN[name]; quietSend = true;
@@ -717,6 +781,14 @@ $('builtinPresets').addEventListener('click', (e) => {
   const b = e.target.closest('[data-slot]'); if (!b) return;
   const k = +b.dataset.slot;
   if (presetEditing) { presetSel = k; renderPresets(); $('presetEditor').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+  if (presetCopying) {                                 // save the current look into the tapped preset
+    const t = slots[k], name = t ? t.name : BUILTIN_NAMES[k], desc = t ? t.desc : BUILTIN[BUILTIN_NAMES[k]].desc;
+    if (!confirm(`Replace ${name} with the current look?`)) return;
+    if (palDirty) send(palLine());
+    quietSend = true; send(`psave ${k} ${name}|${desc}`); quietSend = false; dirty = false; activeSlot = k; updateSaveBtn();
+    setCopying(false); toast('Current look saved as ' + name);
+    return;
+  }
   if (dirty && activeSlot >= 0 && slots[activeSlot]) {
     const cur = slots[activeSlot];
     if (confirm(`You changed ${cur.name}. Save those changes before switching?\n\nOK = save to ${cur.name}   Cancel = discard them`)) {
@@ -727,19 +799,39 @@ $('builtinPresets').addEventListener('click', (e) => {
   if (slots[k]) { send('pload ' + k); toast('Loading ' + slots[k].name); }
   else if (k < BUILTIN_NAMES.length) applyBuiltin(BUILTIN_NAMES[k]);
 });
+function setCopying(on) {
+  presetCopying = on; $('copyHint').hidden = !on;
+  $('presetCopy').textContent = on ? 'Cancel' : 'Save to preset'; $('presetCopy').setAttribute('aria-pressed', String(on));
+  renderPresets();
+}
+$('presetCopy').addEventListener('click', () => {
+  if (presetEditing) { presetEditing = false; $('presetEdit').textContent = 'Rename / reset'; $('presetEdit').setAttribute('aria-pressed', 'false'); }
+  setCopying(!presetCopying);
+});
 $('presetEdit').addEventListener('click', () => {
+  if (presetCopying) setCopying(false);
   presetEditing = !presetEditing; presetSel = -1;
   $('presetEdit').textContent = presetEditing ? 'Done' : 'Rename / reset'; $('presetEdit').setAttribute('aria-pressed', String(presetEditing));
   renderPresets();
+});
+function setEditAll(on) {
+  editAll = on; $('allBar').hidden = !on;
+  $('presetAll').textContent = on ? 'Done' : 'Edit all'; $('presetAll').setAttribute('aria-pressed', String(on));
+  if (on) toast('Changes now go to every preset');
+}
+$('presetAll').addEventListener('click', () => setEditAll(!editAll));
+$('allDone').addEventListener('click', () => setEditAll(false));
+$('presetEditor').addEventListener('input', () => {        // Save shows up once the name or description changed
+  const k = presetSel, sl = slots[k]; if (!sl || !$('peSave')) return;
+  $('peSave').hidden = $('peName').value.trim() === sl.name && $('peDesc').value.trim() === sl.desc;
 });
 $('presetEditor').addEventListener('click', (e) => {
   const k = presetSel; if (k < 0) return;
   const clean = t => t.replace(/[|\n\r]/g, ' ').trim();
   if (e.target.id === 'peSave') {
-    const name = clean($('peName').value).slice(0, 30) || (k < BUILTIN_NAMES.length ? BUILTIN_NAMES[k] : 'My look ' + (k - BUILTIN_NAMES.length + 1));
-    const desc = clean($('peDesc').value).slice(0, 60);
-    if (palDirty) send(palLine());                     // make sure the orb has the palette you're looking at
-    quietSend = true; send(`psave ${k} ${name}|${desc}`); quietSend = false; dirty = false; activeSlot = k; updateSaveBtn(); toast('Saved "' + name + '" - the orb now starts with it');
+    const name = clean($('peName').value).slice(0, 30), desc = clean($('peDesc').value).slice(0, 60);
+    if (!name) { toast('The name can\'t be empty'); return; }
+    send(`pname ${k} ${name}|${desc}`); $('peSave').hidden = true; toast('Renamed to "' + name + '"');
   }
   if (e.target.id === 'peClear') { send('pclear ' + k); installBuiltins([k]); toast('Back to the built-in ' + BUILTIN_NAMES[k]); }
 });
@@ -755,6 +847,7 @@ function installBuiltins(list) {
     Object.entries(p.set).forEach(([key, v]) => send(`set ${key} ${v}`));
     send(palLineOf(builtinPal(p)));
     send(`psave ${k} ${n}|${p.desc}|b`);
+    if (link && link.pause) link.pause(400);           // let the orb finish writing to its memory
   });
   send('defaults nocal'); send('quiet 0');
   gettingAll = true; send('load'); send('pinfo');      // back to the startup look, and fresh slot info
@@ -809,6 +902,7 @@ function colourAt(p) {                                  // the palette's colour 
 function drawMarks() {
   const bar = $('palBar'); bar.style.background = gradientDomain(pal);
   $('stHeat').style.backgroundImage = gradient(pal);    // heat bar in the palette's own colours
+  $('stHeat').style.backgroundSize = ($('stHeat').parentElement.clientWidth || 64) + 'px 100%';
   $('palEd').querySelectorAll('.mark').forEach(m => m.remove());
   pal.forEach(([p, h, sat], i) => {
     const m = document.createElement('button'); m.type = 'button'; m.className = 'mark' + (i === palSel ? ' sel' : '');
@@ -1069,6 +1163,7 @@ function onLine(line) {
                 break;
     case 'locked': showPin('The orb is locked. Enter its PIN.'); break;
   }
+  if (w[0] === 'ok' && w[1] === 'pall') { toast(`Saved to ${w[3]} presets`); send('pinfo'); }
   if (w[0] === 'ok' && (w[1] === 'pload' || w[1] === 'psave')) { if (w[1] === 'pload') gettingAll = true; activeSlot = +w[2]; dirty = false; updateSaveBtn(); }
   if (w[0] === 'cur') { activeSlot = +w[1]; updateSaveBtn(); }
 }
@@ -1107,7 +1202,9 @@ async function connectBle() {
   async function pump() {
     if (busy) return; busy = true;
     while (q.length) {
-      const bytes = enc.encode(q.shift());
+      const item = q.shift();
+      if (typeof item === 'object') { await new Promise(r => setTimeout(r, item.wait)); continue; }   // a pause (the orb is saving)
+      const bytes = enc.encode(item);
       for (let o = 0; o < bytes.length; o += 20) {
         try { await rx.writeValueWithoutResponse(bytes.slice(o, o + 20)); }
         catch (err) {
@@ -1115,10 +1212,11 @@ async function connectBle() {
           catch (e2) { try { await rx.writeValue(enc.encode('\n')); } catch (e3) {} break; }   // end the broken line
         }
       }
+      await new Promise(r => setTimeout(r, 3));                       // a little breathing room per line
     }
     busy = false;
   }
-  const my = { send(line) { q.push(line + '\n'); pump(); } };
+  const my = { send(line) { q.push(line + '\n'); pump(); }, pause(ms) { q.push({ wait: ms }); pump(); } };
   link = my;
   clearInterval(demoTimer); $('demoNote').hidden = true; $('offNote').hidden = true;
   dev.addEventListener('gattserverdisconnected', () => {
@@ -1222,8 +1320,10 @@ function startDemo() {
     else if (w[0] === 'pinfo') { for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`); reply('cur -1'); }
     else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
       demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+    else if (w[0] === 'pname') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|'); if (demoSlots[k]) { const f = demoSlots[k].split('|'); f[3] = nd[0]; f[4] = nd[1] || ''; f[7] = '0'; demoSlots[k] = f.join('|'); reply('ok pname ' + k); reply(demoSlots[k]); } }
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
+    else if (w[0] === 'pall') { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); const n = Object.keys(demoSlots).length; for (const k in demoSlots) { const f = demoSlots[k].split('|'); f[7] = '0'; demoSlots[k] = f.join('|'); } reply(`ok pall ${w[1]} ${n}`); }
     else if (w[0] === 'setpin') reply('pin changed');
   } };
   $('demoNote').hidden = false;
@@ -1254,7 +1354,6 @@ $('btnConnect').addEventListener('click', async () => {
 if (!navigator.bluetooth) $('noBle').hidden = false;
 startDemo();
 </script>
-
 
 </body>
 </html>

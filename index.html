@@ -46,6 +46,13 @@ header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; backg
 /* Fixed layout so loading never makes the bar jump: one row of actions, two fixed rows of chips */
 .actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; max-width: 760px; margin: 10px auto 0; }
 .actions button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sec > .card-head:first-child { cursor: pointer; }
+.sec { position: relative; }
+.sec > .card-head:first-child { padding-right: 26px; }
+.sec .chev { position: absolute; top: 18px; right: 14px; color: var(--muted); font-size: 1rem; transition: transform .15s; pointer-events: none; }
+.sec.collapsed .chev { transform: rotate(-90deg); }
+.sec.collapsed > :not(:first-child) { display: none !important; }
+.sec.collapsed > .card-head:first-child .grow p { display: none; }
 .gradbar { height: 18px; border-radius: 6px; border: 1px solid var(--line); }
 .allbar { display: flex; align-items: center; gap: 10px; max-width: 760px; margin: 10px auto 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .orb-dot { width: 28px; height: 28px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 45%), var(--orb); box-shadow: 0 0 18px var(--orb); flex: none; transition: background .6s, box-shadow .6s; }
@@ -238,6 +245,10 @@ select { width: auto; }
       <div class="rows" id="presetEditor" hidden></div>
     </div>
     <div class="card">
+      <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">Complete looks built on the new features. Each starts from clean defaults (power and calibration kept) and sets everything it needs. Nothing is saved until you press Save at the top.</p></div></div>
+      <div class="rows" id="ideaList"></div>
+    </div>
+    <div class="card">
       <div class="card-head"><div class="grow"><h2>Effects on / off</h2></div></div>
       <div id="fxList"></div>
     </div>
@@ -253,30 +264,25 @@ select { width: auto; }
       <div class="btns"><button id="btnSweep">Sweep on the orb</button></div>
       <div class="rows" id="stops"></div>
       <div class="btns"><button class="primary" id="btnSendPal">Done editing</button><span class="muted small" id="palDirty"></span></div>
-    </div>
-    <div class="card">
-      <div class="card-head"><div class="grow"><h2>Palette presets</h2><p class="muted small">Starting points that looked good on this orb. Tap one, then adjust.</p></div></div>
-      <div class="presets" id="palPresets"></div>
-    </div>
-    <div class="card">
-      <div class="card-head"><div class="grow"><h2>Gradient</h2><p class="muted small">Different colours from the bottom of the orb to the top.</p></div>
-        <div class="seg" id="gradSeg" data-key="grad"><button data-v="0">Solid</button><button data-v="1">Gradient</button></div></div>
+      <div class="card-head" style="border-top:1px solid var(--line);padding-top:14px"><div class="grow"><h3>Gradient</h3><p class="muted small">Different colours from the bottom of the orb to the top.</p></div>
+        <div class="seg" id="gradSeg"><button data-g="0">One colour</button><button data-g="1">Palette</button><button data-g="3">Scheme</button><button data-g="2">Fixed</button></div></div>
       <div class="rows" id="gradBody">
-        <div class="card-head"><div class="grow"><h3>Colours</h3><p class="muted small" id="gradSrcDesc"></p></div>
-          <div class="seg" data-key="gradsrc"><button data-v="0">Palette</button><button data-v="1">Fixed</button></div></div>
+        <p class="muted small" id="gradSrcDesc"></p>
+        <div class="rows" id="gradLooks"><h3>Looks</h3><p class="muted small">Starting points: each sets the colours, zones and balance in one tap.</p>
+          <div class="btns" id="looksBtns"></div></div>
+        <div class="seg" id="schemeSeg" data-key="gscheme"><button data-v="0">Smooth</button><button data-v="1">Contrast</button><button data-v="2">Triad</button></div>
         <div class="gradbar" id="gradBar" aria-hidden="true"></div>
         <div class="fx-row" style="border-top:0"><label class="switch"><input type="checkbox" id="gradHold" aria-label="Hold steady"><span></span></label>
           <div class="grow"><h3>Hold steady</h3><p class="muted small">Shows the gradient at a fixed brightness, ignoring the music, so you can judge the colours and balance the turns.</p></div></div>
         <div class="ctl" id="gradHoldRow" hidden><label for="gradHoldV">Hold brightness</label><output id="gradHoldO">60</output><input type="range" id="gradHoldV" min="5" max="255" step="1" value="60"></div>
         <div class="rows" id="gradPal"></div>
         <div class="rows" id="gradFix"></div>
-        <h3>Brightness per turn</h3>
+        <div id="gradBalRow"></div>
+        <h3 id="gradBrHead">Brightness per turn</h3>
         <div class="rows" id="gradBr"></div>
-        <div class="card-head"><div class="grow"><h3>What lights it</h3><p class="muted small" id="gradDriveDesc"></p></div>
-          <div class="seg" data-key="gdrive"><button data-v="0">Even</button><button data-v="1">Reveal</button><button data-v="2">Bands</button></div></div>
-        <div class="rows" id="gradRev"><div class="btns"><button id="btnReveal">Test the fill on the orb</button></div></div>
+        <div class="fx-row" id="bandsRow"><label class="switch"><input type="checkbox" id="bandsOn" aria-label="Bands"><span></span></label>
+          <div class="grow"><h3>Bands</h3><p class="muted small">Each turn flickers with its own sound: bass at the bottom, then low-mids, mids, and highs at the face.</p></div></div>
         <div class="rows" id="gradBand"></div>
-        <div id="gradBuild"></div>
       </div>
     </div>
     <div class="card">
@@ -293,6 +299,10 @@ select { width: auto; }
       <div class="seg" id="partySeg"><button data-v="0">Off</button><button data-v="1">Neighbours</button><button data-v="2">2 stops</button><button data-v="9">Anywhere</button></div>
       <div class="rows" id="partyCtl"></div>
     </div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Palette presets</h2><p class="muted small">Starting points that looked good on this orb. Tap one, then adjust.</p></div></div>
+      <div class="presets" id="palPresets"></div>
+    </div>
   </section>
 
   <!-- EFFECTS -->
@@ -303,7 +313,15 @@ select { width: auto; }
   <!-- FEEL -->
   <section class="tab" id="tab-feel" role="tabpanel" hidden>
     <div class="card"><div class="card-head"><div class="grow"><h2>Bass pulse</h2><p class="muted small" id="pumpDesc"></p></div>
-      <div class="seg" data-key="pump"><button data-v="0">Dip</button><button data-v="1">Pump</button></div></div><div class="rows" id="feelDips"></div></div>
+      <div class="seg" data-key="pump"><button data-v="0">Dip</button><button data-v="1">Pump</button></div></div>
+      <div class="card-head"><div class="grow"><h3>What the bass moves</h3></div><div class="seg" data-key="bassh"><button data-v="0">Brightness</button><button data-v="1">Height</button></div></div>
+      <div class="rows" id="feelDips"></div></div>
+    <div class="card">
+      <div class="card-head"><div class="grow"><h2>Height and zones</h2><p class="muted small">Each turn of LEDs lights its own part of the ball: the bottom turn the base and the top of the ball, the next the bottom sides, then the sides, and the top turn the face.</p></div></div>
+      <div id="heightToggles"></div>
+      <div class="rows" id="zoneCaps"></div>
+      <div class="btns"><button id="btnReveal">Test the height on the orb</button></div>
+    </div>
     <div class="card"><h2>Quiet and singing parts</h2><div class="rows" id="feelSing"></div></div>
   </section>
 
@@ -313,11 +331,10 @@ select { width: auto; }
       <label class="switch"><input type="checkbox" id="demoSong" aria-label="Demo song"><span></span></label></div><p class="small muted" id="demoSongState"></p></div>
     <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
-      <details><summary><h2 style="display:inline">Remote</h2> <span class="muted small">Mr.Go button map</span></summary>
+      <h2>Remote</h2><p class="muted small">What each button on the Mr.Go remote does.</p>
       <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
       <svg id="remoteSvg" viewBox="-14 0 388 362" role="img" aria-label="Mr.Go remote button guide"></svg>
       <p class="muted small">SMOOTH switches the colour buttons between presets and effects. In lamp mode, the brightness buttons change the lamp brightness. Blackout stays dark until the next kick.</p>
-      </details>
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>LED finder</h2><p class="muted small">Lights one LED white. With neighbours on, it also shows where the orb thinks left, right, up and down are.</p></div></div>
@@ -412,11 +429,7 @@ const TURNS = ['Bottom', 'Lower', 'Upper', 'Top'];
 const GRAD_PAL = [ S('gradspread', 'Spread', 0, 1.5, 0.05, { fmt: v => v.toFixed(2), hint: 'How far along the palette the top is from the bottom. 0 = one colour.' }) ];
 const GRAD_FIX = [3, 2, 1, 0].flatMap(k => [ S('gh' + k, TURNS[k] + ' colour', 0, 255, 1, { hue: true }), S('gs' + k, TURNS[k] + ' saturation', 0, 255, 1) ]);
 const GRAD_BR = [3, 2, 1, 0].map(k => S('gb' + k, TURNS[k], 0, 1, 0.05, { fmt: pct }));
-const GRAD_REV = [
-  S('revrange', 'Range', 4, 30, 1, { fmt: v => v + ' dB', hint: 'Smaller = the orb fills up more easily. The top lights when the bass is at its recent peak.' }),
-  S('revmin', 'Always lit', 0, 1, 0.05, { fmt: pct, hint: 'Share of the orb that stays lit with no bass (25% = the bottom turn).' }),
-  S('revrel', 'Sink speed', 50, 2000, 10, { fmt: v => v + ' ms', hint: 'How long the fill takes to sink again. It rises straight away.' }),
-];
+const ZONE_CAPS = [3, 2, 1, 0].map(k => S('zc' + k, ['Bottom (background)', 'Lower', 'Upper', 'Face'][k] + ' ceiling', 0.02, 1, 0.01, { fmt: pct }));
 const GRAD_BAND = [ S('bandmin', 'Quiet turn keeps', 0, 1, 0.05, { fmt: pct, hint: 'Light left on a turn whose band is quiet.' }) ];
 const FX = [
   ['fx_dips', 'Bass dips', 'The pulse: the glow dips with the bass.', null],
@@ -638,15 +651,19 @@ function renderAll() {
   $('lampCtl').hidden = vals.mode != 1;
   $('lampGradCtl').hidden = vals.lampgrad != 1;
   document.querySelectorAll('.seg[data-key]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === +(vals[seg.dataset.key] ?? 0)))));
-  const g = vals.grad == 1, src = +(vals.gradsrc ?? 0), drv = +(vals.gdrive ?? 0);
-  $('gradBody').hidden = !g;
-  $('gradPal').hidden = src !== 0; $('gradFix').hidden = src !== 1;
-  $('gradSrcDesc').textContent = src === 0 ? 'Taken from the palette around the current glow colour, so it slides with the music.' : 'Your own colour for each turn, blended in between.';
-  $('gradBar').hidden = src !== 1;
+  const g = vals.grad == 1, src = +(vals.gradsrc ?? 0), drv = +(vals.gdrive ?? 0), gsel = g ? [1, 2, 3][src] : 0;
+  document.querySelectorAll('#gradSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.g === gsel)));
+  $('gradPal').hidden = !g || src !== 0; $('gradFix').hidden = !g || src !== 1;
+  $('gradBr').hidden = !g; $('gradBrHead').hidden = !g; $('bandsRow').hidden = !g;
+  $('gradSrcDesc').textContent = !g ? 'The whole orb in the glow colour, as usual.' : src === 0 ? 'Each turn takes a colour from the palette around the current glow colour, so it slides with the music.' : src === 2 ? 'Colours worked out from the glow colour, so they follow the music: Smooth = neighbouring colours, Contrast = the face in the opposite colour, Triad = three colours evenly apart.' : 'Your own colour for each turn.';
+  $('schemeSeg').hidden = !g || src !== 2; $('gradBalRow').hidden = !g;
+  $('gradBar').hidden = !g || src !== 1;
+  $('bandsOn').checked = drv === 2;
+  $('zoneCaps').hidden = vals.zones != 1;
   $('gradBar').style.background = `linear-gradient(90deg, ${[0, 1, 2, 3].map(k => css(vals['gh' + k] ?? 0, vals['gs' + k] ?? 255)).join(', ')})`;
-  $('pumpDesc').textContent = (vals.pump == 1 ? 'The glow brightens on each bass note and darkens in the gaps.' : 'The glow darkens on each bass note and comes back in the gaps.') + (vals.grad == 1 && drv > 0 ? ' Off while the gradient uses Reveal or Bands: the gradient follows the bass instead.' : '');
-  $('gradRev').hidden = drv !== 1; $('gradBand').hidden = drv !== 2;
-  $('gradDriveDesc').textContent = ['All turns lit; the volume and the bass pulse work as usual.', 'The bass fills the orb from the bottom; the top stays dark until the bass is strong. Replaces the bass pulse.', 'Each turn follows its own sound: bass at the bottom, then low-mids, mids, and highs on top. Replaces the bass pulse.'][drv];
+  $('pumpDesc').textContent = vals.bassh == 1 ? (vals.pump == 1 ? 'Each bass note throws the light up towards the face, and it sinks back in the gaps.' : 'Each bass note knocks the light down from the face towards the bottom, and it climbs back in the gaps.')
+    : (vals.pump == 1 ? 'The glow brightens on each bass note and darkens in the gaps.' : 'The glow darkens on each bass note and comes back in the gaps.') + (vals.grad == 1 && drv === 2 ? ' Off while Bands is on: each turn follows its own sound instead.' : '');
+  $('gradBand').hidden = drv !== 2 || !g;
   document.querySelectorAll('#partySeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === +(vals.partyrange ?? 1) || (+b.dataset.v === 9 && vals.partyrange >= 3))));
   document.querySelectorAll('#dirSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === rows.dir)));
   colourRows.forEach(renderColourRow);
@@ -689,16 +706,24 @@ LAMP.forEach(d => $('lampCtl').appendChild(slider(d)));
 GRAD_PAL.forEach(d => $('gradPal').appendChild(slider(d)));
 GRAD_FIX.forEach(d => $('gradFix').appendChild(slider(d)));
 GRAD_BR.forEach(d => $('gradBr').appendChild(slider(d)));
-GRAD_REV.forEach(d => $('gradRev').insertBefore(slider(d), $('btnReveal').parentNode));
 GRAD_BAND.forEach(d => $('gradBand').appendChild(slider(d)));
-$('gradBuild').appendChild(toggle('gbuild', 'Build-ups fill from the bottom', 'As a build-up gets more intense, the light climbs to the top.', null));
+$('heightToggles').appendChild(toggle('volfill', 'Volume fills the orb', 'Quiet parts light only the bottom, loud parts reach all the way to the face.', null));
+$('heightToggles').appendChild(toggle('gbuild', 'Build-ups climb', 'As a build-up gets more intense, the light climbs to the face.', null));
+$('heightToggles').appendChild(toggle('zones', 'Keep the zones separate', 'Each turn stays below its ceiling, so the areas of the ball keep their own colour instead of washing together.', null));
+ZONE_CAPS.forEach(d => $('zoneCaps').appendChild(slider(d)));
+document.querySelectorAll('#gradSeg button').forEach(b => b.addEventListener('click', () => {
+  const g = +b.dataset.g; vals.grad = g ? 1 : 0; send('set grad ' + vals.grad);
+  if (g) { vals.gradsrc = { 1: 0, 2: 1, 3: 2 }[g]; send('set gradsrc ' + vals.gradsrc); }
+  renderAll();
+}));
+$('bandsOn').addEventListener('change', e => { vals.gdrive = e.target.checked ? 2 : 0; send('set gdrive ' + vals.gdrive); renderAll(); });
 document.querySelectorAll('.seg[data-key]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   const k = seg.dataset.key; vals[k] = +b.dataset.v; send(`set ${k} ${vals[k]}`); renderAll();
 })));
 const sendHold = () => send($('gradHold').checked ? 'tool gradhold ' + $('gradHoldV').value : 'tool off');
 $('gradHold').addEventListener('change', () => { $('gradHoldRow').hidden = !$('gradHold').checked; sendHold(); });
 $('gradHoldV').addEventListener('input', () => { $('gradHoldO').textContent = $('gradHoldV').value; clearTimeout(sendTimers.hold); sendTimers.hold = setTimeout(sendHold, 120); });
-$('btnReveal').addEventListener('click', () => { send('tool reveal'); toast('The fill sweeps up and down once'); });
+$('btnReveal').addEventListener('click', () => { send('tool reveal'); toast('The light climbs to the face and back down once'); });
 { const r = toggle('lampbreathe', 'Slow breathing', 'Gently rises and falls instead of a steady light.', null); r.style.borderTop = '0'; $('lampCtl').appendChild(r); }
 $('lampCtl').appendChild(toggle('lampgrad', 'Two colours', 'Fades from the colour above at the bottom to a second colour at the top.', null));
 { const box = document.createElement('div'); box.className = 'rows'; box.id = 'lampGradCtl';
@@ -722,6 +747,76 @@ FX_CARDS.forEach(c => {
   if (c.col) card.appendChild(colourRow(c.col, c.autoDesc));
   $('fxCards').appendChild(card);
 });
+// Gradient looks: one tap sets the colours, zones and balance
+const LOOKS = {
+  'Blue + red face': { grad: 1, gradsrc: 1, gheat: 0.3, gh0: 158, gh1: 192, gh2: 99, gh3: 13, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 0, zones: 1, gbal: 1 },
+  'Pearl': { grad: 1, gradsrc: 1, gheat: 0, gh0: 160, gh1: 224, gh2: 32, gh3: 112, gs0: 170, gs1: 170, gs2: 170, gs3: 170, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 24, zones: 0, gbal: 1 },
+  'Contrast': { grad: 1, gradsrc: 2, gscheme: 1, zones: 1, gbal: 1 },
+  'Smooth': { grad: 1, gradsrc: 2, gscheme: 0, zones: 0, gbal: 1 },
+  'Triad': { grad: 1, gradsrc: 2, gscheme: 2, zones: 1, gbal: 1 },
+};
+Object.entries(LOOKS).forEach(([name, set]) => {
+  const b = document.createElement('button'); b.className = 'small'; b.textContent = name;
+  b.addEventListener('click', () => { Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); }); renderAll(); toast(name + ' look'); });
+  $('looksBtns').appendChild(b);
+});
+$('gradBalRow').appendChild(toggle('gbal', 'Balance colours', 'Dims the strong colours (green, yellow) towards the weakest so every turn looks about as bright. Adjusts for dim rooms, where blue looks stronger.', null));
+$('gradFix').appendChild(slider(S('gheat', 'Follow the heat', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '%', hint: 'Shifts all four colours round the wheel as the music heats up and cools down, the way the normal glow moves along the palette.' })));
+$('gradFix').appendChild(slider(S('gspin', 'Colours travel', 0, 120, 1, { fmt: v => v == 0 ? 'still' : 'once round in ' + v + ' s', hint: 'The four colours slowly move from turn to turn (Pearl uses this for a shimmer).' })));
+
+// Ideas to try: full recipes on top of the defaults (see the Orb Feature Guide)
+const FX_OFF = Object.fromEntries(ALL_FX.map(k => [k, 0]));
+const IDEAS = [
+  ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter.', { bassh: 1, pump: 1, volfill: 1, zones: 1, dipdepth: 0.6 }],
+  ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7 }],
+  ['Spotlight dancer', 'A dark ball where the dancer and sparks do the work. Best in a dark room.', { zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30 }],
+  ['Equaliser', 'Bass thumps the base, hats twinkle at the face.', { grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, zones: 1, gbal: 1 }],
+  ['Pearl lounge', 'A slow mother-of-pearl shimmer for chilling.', { ...LOOKS['Pearl'], ...FX_OFF, fx_dips: 1, fx_sing: 1, dipdepth: 0.25, bright: 120 }],
+  ['Build rocket', 'Build-ups climb from the base and burst at the drop.', { zones: 1, gbuild: 1, fx_roll: 1, sling: 0.6 }],
+  ['Garage drift', 'Slow colour movement for long drones and sustained bass.', { grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.3 }],
+  ['Contrast face', 'The face always in the opposite colour to the body.', { ...LOOKS['Contrast'], fx_singer: 1 }],
+  ['Rave', 'Big colour jumps and hard pulses.', { partyrange: 9, pump: 1, dipdepth: 0.85, zones: 0 }, 'Neon'],
+  ['Candle (lamp)', 'A warm two-tone light with slow breathing. No music needed.', { mode: 1, lampgrad: 1, lamphue: 20, lampsat: 255, lamphue2: 0, lampsat2: 255, lampbreathe: 1, lampbright: 90 }],
+];
+function applyIdea([name, , set, palName]) {
+  quietSend = true; gettingAll = true; send('defaults nocal');           // clean start: earlier fiddling can't leak in
+  Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });
+  if (palName) { pal = PAL_PRESETS[palName].map(x => [...x]); sendPalette(); pendingPal = palName; }
+  quietSend = false; dirty = true; updateSaveBtn(); renderAll(); toast(name + ' - press Save to keep it in a preset');
+}
+IDEAS.forEach(idea => {
+  const row = document.createElement('div'); row.className = 'fx-row';
+  row.innerHTML = `<div class="grow"><h3>${idea[0]}</h3><p class="muted small">${idea[1]}</p></div><button class="small">Try</button>`;
+  row.querySelector('button').addEventListener('click', () => applyIdea(idea));
+  $('ideaList').appendChild(row);
+});
+
+// Every card is a section that folds away; tap its title. Remembered per phone.
+const OPEN_BY_DEFAULT = new Set(['tab-home:Mode', 'tab-home:Presets', 'tab-colours:Palette', 'tab-feel:Bass pulse', 'tab-setup:Global']);
+(function makeSections() {
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('orbSecs') || '{}'); } catch (e) {}
+  const save = () => { try { localStorage.setItem('orbSecs', JSON.stringify(saved)); } catch (e) {} };
+  document.querySelectorAll('section.tab .card').forEach(card => {
+    let head = card.firstElementChild;
+    if (head && head.tagName === 'H2') {                       // plain cards: wrap the title (+ its line) into a head
+      const h = document.createElement('div'); h.className = 'card-head'; const g = document.createElement('div'); g.className = 'grow';
+      const p = head.nextElementSibling; card.insertBefore(h, head); g.appendChild(head);
+      if (p && p.matches('p.muted')) g.appendChild(p);
+      h.appendChild(g); head = h;
+    }
+    if (!head || !head.classList.contains('card-head')) return;
+    const h2 = head.querySelector('h2'); if (!h2) return;
+    const key = card.closest('section.tab').id + ':' + h2.textContent.trim();
+    card.classList.add('sec');
+    const chev = document.createElement('span'); chev.className = 'chev'; chev.setAttribute('aria-hidden', 'true'); chev.textContent = '▾'; head.appendChild(chev);
+    h2.tabIndex = 0; h2.setAttribute('role', 'button');
+    const set = (open) => { card.classList.toggle('collapsed', !open); h2.setAttribute('aria-expanded', String(open)); };
+    set(key in saved ? saved[key] : OPEN_BY_DEFAULT.has(key));
+    const flip = () => { const open = card.classList.contains('collapsed'); set(open); saved[key] = open; save(); };
+    head.addEventListener('click', (e) => { if (!e.target.closest('input, button, label, select, .seg, a, output')) flip(); });
+    h2.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+  });
+})();
 document.addEventListener('click', (e) => { const b = e.target.closest('[data-trig]'); if (b) { send('t ' + b.dataset.trig); toast('Fired: ' + b.dataset.trig); } });
 
 addEventListener('resize', () => { const h = $('stHeat'); h.style.backgroundSize = (h.parentElement.clientWidth || 64) + 'px 100%'; });
@@ -1373,7 +1468,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
-  pump: 0, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
+  gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
   gdrive: 0, revrange: 12, revmin: 0.25, revrel: 250, bandmin: 0.2, gbuild: 1, lampgrad: 0, lamphue2: 200, lampsat2: 200,
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,

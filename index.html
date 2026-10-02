@@ -265,6 +265,9 @@ select { width: auto; }
         <div class="card-head"><div class="grow"><h3>Colours</h3><p class="muted small" id="gradSrcDesc"></p></div>
           <div class="seg" data-key="gradsrc"><button data-v="0">Palette</button><button data-v="1">Fixed</button></div></div>
         <div class="gradbar" id="gradBar" aria-hidden="true"></div>
+        <div class="fx-row" style="border-top:0"><label class="switch"><input type="checkbox" id="gradHold" aria-label="Hold steady"><span></span></label>
+          <div class="grow"><h3>Hold steady</h3><p class="muted small">Shows the gradient at a fixed brightness, ignoring the music, so you can judge the colours and balance the turns.</p></div></div>
+        <div class="ctl" id="gradHoldRow" hidden><label for="gradHoldV">Hold brightness</label><output id="gradHoldO">60</output><input type="range" id="gradHoldV" min="5" max="255" step="1" value="60"></div>
         <div class="rows" id="gradPal"></div>
         <div class="rows" id="gradFix"></div>
         <h3>Brightness per turn</h3>
@@ -692,6 +695,9 @@ $('gradBuild').appendChild(toggle('gbuild', 'Build-ups fill from the bottom', 'A
 document.querySelectorAll('.seg[data-key]').forEach(seg => seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   const k = seg.dataset.key; vals[k] = +b.dataset.v; send(`set ${k} ${vals[k]}`); renderAll();
 })));
+const sendHold = () => send($('gradHold').checked ? 'tool gradhold ' + $('gradHoldV').value : 'tool off');
+$('gradHold').addEventListener('change', () => { $('gradHoldRow').hidden = !$('gradHold').checked; sendHold(); });
+$('gradHoldV').addEventListener('input', () => { $('gradHoldO').textContent = $('gradHoldV').value; clearTimeout(sendTimers.hold); sendTimers.hold = setTimeout(sendHold, 120); });
 $('btnReveal').addEventListener('click', () => { send('tool reveal'); toast('The fill sweeps up and down once'); });
 { const r = toggle('lampbreathe', 'Slow breathing', 'Gently rises and falls instead of a steady light.', null); r.style.borderTop = '0'; $('lampCtl').appendChild(r); }
 $('lampCtl').appendChild(toggle('lampgrad', 'Two colours', 'Fades from the colour above at the bottom to a second colour at the top.', null));

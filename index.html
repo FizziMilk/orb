@@ -286,6 +286,8 @@ select { width: auto; }
 
   <!-- SETUP -->
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
+    <div class="card"><div class="card-head"><div class="grow"><h2>Demo song</h2><p class="muted small">The orb plays a made-up track into its own detection instead of the mic: calm, build-up, drop, groove, then a short silence, on a loop (about 2.5 minutes). For showing it off quietly or testing effects.</p></div>
+      <label class="switch"><input type="checkbox" id="demoSong" aria-label="Demo song"><span></span></label></div><p class="small muted" id="demoSongState"></p></div>
     <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
       <details><summary><h2 style="display:inline">Remote</h2> <span class="muted small">Mr.Go button map</span></summary>
@@ -414,7 +416,7 @@ const PARTY = [
   S('partyhold', 'Each colour holds', 8, 128, 8, { fmt: v => v + ' beats' }),
 ];
 const FX_CARDS = [
-  { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the dancer and the flood.', toggle: 'fx_singer', col: 'eye', autoDesc: 'white, or a contrasting colour on blue / purple', items: [
+  { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the dancer and the flood.', toggle: 'fx_singer', col: 'eye', autoDesc: "the glow's opposite colour", items: [
     S('eyesing', 'Brightness', 10, 150, 1), S('pitch', 'Up / down range', 0, 1.5, 0.05, { fmt: v => v.toFixed(2) + ' turns' }),
     S('sidemax', 'Sideways lean', 0, 2, 0.1, { fmt: v => v.toFixed(1) + ' LEDs' }), S('open', 'Opens with the voice', 0, 2, 0.05, { fmt: v => v.toFixed(2) }),
     S('spring', 'Snappiness', 20, 1000, 10, { hint: 'Low = floaty, high = sharp.' }) ] },
@@ -426,7 +428,7 @@ const FX_CARDS = [
     S('fadeout', 'Fade-out when leaving', 0.5, 16, 0.5, { fmt: v => v + ' beats' }) ] },
   { title: 'Eye contrast', sub: 'Shared by the singer and the dancer.', items: [
     S('cap', 'Glow limit behind the eye', 20, 255, 1, { hint: 'Lower = the eye stands out more, the rest of the orb dims.' }),
-    S('coolgain', 'Extra brightness on blue / purple', 0.5, 6, 0.1, { fmt: v => '×' + v.toFixed(1) }) ] },
+    S('coolgain', 'Colour boost', 0.5, 6, 0.1, { fmt: v => '×' + v.toFixed(1), hint: 'A coloured eye needs more light than a white one to show the same.' }) ] },
   { title: 'Clap sparks', sub: 'Top left and right, on the backbeat once the clap grid locks.', toggle: 'fx_claps', trig: 'clap', col: 'clap', autoDesc: "the glow colour's neighbour (accent)", items: [
     S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }), S('clapdb', 'Lock sensitivity', 0.5, 8, 0.5, { fmt: v => v + ' dB', hint: 'Lower = locks onto claps more easily.' }) ] },
   { title: 'Hat sparks', sub: 'Bottom sides, on the off-beats once the hat grid locks.', toggle: 'fx_hats', trig: 'hat', col: 'hat', autoDesc: 'warm white', items: [
@@ -435,7 +437,7 @@ const FX_CARDS = [
   { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [ S('roll', 'Strength', 0, 1.5, 0.05, { fmt: pct }) ] },
   { title: 'Drop sparkles', sub: 'Busy drums in drops.', toggle: 'fx_sparkles', trig: 'sparkle', col: 'spark', autoDesc: 'the glow colour, a little warmer and richer', items: [
     S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }), S('sparkbusy', 'Drums needed', 0.5, 3, 0.1, { fmt: v => v.toFixed(1) + ' hits/beat' }) ] },
-  { title: 'Drop-end spin', sub: 'A bright side sweeps round as a drop ends.', toggle: 'fx_spin', trig: 'spin', col: 'spin', autoDesc: 'near-white on warm colours, the accent on blue / purple', items: [
+  { title: 'Drop-end spin', sub: 'A bright side sweeps round as a drop ends.', toggle: 'fx_spin', trig: 'spin', col: 'spin', autoDesc: "the glow's opposite colour", items: [
     S('spinbeats', 'Duration', 0.5, 16, 0.5, { fmt: v => v + ' beats' }), S('spinturns', 'Turns', 0.25, 8, 0.25),
     S('spingain', 'Brightness', 1, 16, 0.5, { fmt: v => '×' + v }), S('spindim', 'Dims the rest', 0, 1, 0.05, { fmt: pct }) ] },
   { title: 'Drop ripple and slingshot', sub: 'When the drop lands.', toggle: 'fx_ripple', trig: 'ripple', col: 'ripple', autoDesc: 'a brighter glow colour', items: [
@@ -1115,11 +1117,18 @@ $('factoryBox').addEventListener('click', (e) => {            // one listener, s
 // Save / revert
 $('btnSave').addEventListener('click', () => {
   const s = activeSlot >= 0 ? slots[activeSlot] : null;
-  if (s) { if (palDirty) send(palLine()); send(`psave ${activeSlot} ${s.name}|${s.desc}`); toast('Saved to ' + s.name); }
-  else { send('save'); toast('Saved on the orb'); }
+  if (s) {
+    if (!confirm(`Save the current settings to ${s.name}?\n\nThis replaces what ${s.name} had stored, and the orb starts with it next time.`)) return;
+    if (palDirty) send(palLine()); send(`psave ${activeSlot} ${s.name}|${s.desc}`); toast('Saved to ' + s.name);
+  } else {
+    if (!confirm('Save the current settings on the orb?\n\nThey become the startup look and stay after a restart.')) return;
+    send('save'); toast('Saved on the orb');
+  }
   dirty = false; updateSaveBtn();
 });
 $('btnRevert').addEventListener('click', () => { dirty = false; updateSaveBtn(); gettingAll = true; send('load'); toast('Back to the last saved settings'); });
+
+$('demoSong').addEventListener('change', e => send('demo ' + (e.target.checked ? 1 : 0)));
 
 // ---------------- Incoming lines ----------------
 let currentHue = 20;
@@ -1163,6 +1172,7 @@ function onLine(line) {
                 break;
     case 'locked': showPin('The orb is locked. Enter its PIN.'); break;
   }
+  if (w[0] === 'demo') { $('demoSong').checked = w[1] === 'on'; $('demoSongState').textContent = w[1] === 'on' ? 'Playing on the orb. The live strip at the top shows the section.' : ''; }
   if (w[0] === 'ok' && w[1] === 'pall') { toast(`Saved to ${w[3]} presets`); send('pinfo'); }
   if (w[0] === 'ok' && (w[1] === 'pload' || w[1] === 'psave')) { if (w[1] === 'pload') gettingAll = true; activeSlot = +w[2]; dirty = false; updateSaveBtn(); }
   if (w[0] === 'cur') { activeSlot = +w[1]; updateSaveBtn(); }
@@ -1183,8 +1193,8 @@ function requestAll() { gettingAll = true; slotSeen = new Set(); installDone = f
 // ---------------- Bluetooth link (Nordic UART) ----------------
 const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 let bleDev = null;
-async function connectBle() {
-  const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'Orb' }], optionalServices: [NUS] });
+async function connectBle(known) {                     // known: reconnect to the same orb without the chooser
+  const dev = known || await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'Orb' }], optionalServices: [NUS] });
   if (bleDev && bleDev !== dev && bleDev.gatt.connected) bleDev.gatt.disconnect();
   bleDev = dev;
   $('connState').textContent = 'Connecting…';
@@ -1229,7 +1239,8 @@ async function connectBle() {
   if (saved) send('pin ' + saved); else showPin('');
 }
 function setConnected(on, msg) {
-  $('connState').textContent = msg; $('btnConnect').textContent = on ? 'Reconnect' : 'Connect';
+  $('connState').textContent = msg; $('btnConnect').textContent = on ? 'Disconnect' : 'Connect';
+  $('btnConnect').classList.toggle('primary', !on);
   $('btnSave').disabled = !on; $('btnRevert').disabled = !on;
 }
 
@@ -1325,6 +1336,7 @@ function startDemo() {
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
     else if (w[0] === 'pall') { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); const n = Object.keys(demoSlots).length; for (const k in demoSlots) { const f = demoSlots[k].split('|'); f[7] = '0'; demoSlots[k] = f.join('|'); } reply(`ok pall ${w[1]} ${n}`); }
     else if (w[0] === 'setpin') reply('pin changed');
+    else if (w[0] === 'demo') reply('demo ' + (w[1] === '1' ? 'on (calm)' : 'off'));
   } };
   $('demoNote').hidden = false;
   setConnected(false, 'Demo: pretend orb');
@@ -1341,6 +1353,7 @@ function startDemo() {
 }
 
 $('btnConnect').addEventListener('click', async () => {
+  if (bleDev && bleDev.gatt.connected) { releaseOrb(); return; }   // connected: the button disconnects (frees the orb for others)
   if (!navigator.bluetooth) { $('noBle').hidden = false; toast('Bluetooth is not available in this browser'); return; }
   try { $('demoNote').hidden = true; await connectBle(); }
   catch (err) {
@@ -1350,6 +1363,24 @@ $('btnConnect').addEventListener('click', async () => {
     if (!link) startDemo(); else $('demoNote').hidden = false;
   }
 });
+// One phone at a time: the orb is invisible to others while connected, so let go of it properly
+let autoReleased = false, hideTimer = 0;
+function releaseOrb(msg) {
+  if (!bleDev || !bleDev.gatt.connected) return;
+  bleDev.gatt.disconnect();
+  setConnected(false, msg || 'Disconnected - tap Connect');
+}
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(hideTimer);
+  if (document.hidden) {                                 // in the background for a minute: free the orb
+    hideTimer = setTimeout(() => { if (bleDev && bleDev.gatt.connected) { autoReleased = true; releaseOrb('Disconnected while in the background'); } }, 60000);
+  } else if (autoReleased && bleDev) {                   // back again: reconnect quietly to the same orb
+    autoReleased = false;
+    connectBle(bleDev).catch(() => { toast('The orb is busy or out of range - tap Connect'); setConnected(false, 'Disconnected - tap Connect'); });
+  }
+});
+setInterval(() => { if (link && bleDev && bleDev.gatt.connected && !document.hidden) link.send('ping'); }, 30000);   // keep-alive (the orb drops silent phones after 10 min)
+
 // Start in demo so the controls show real values straight away
 if (!navigator.bluetooth) $('noBle').hidden = false;
 startDemo();

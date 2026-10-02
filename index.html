@@ -253,6 +253,11 @@ select { width: auto; }
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">A library of looks and effects found while experimenting, to build presets from. Each starts from clean defaults (power and calibration kept), turns off every effect it isn't about, and sets its own colours and brightness. Tweak it, then keep it with Save to preset.</p></div></div>
+      <details class="sub" id="subImport"><summary>Import or share a look</summary>
+        <p class="muted small">Copy the current look as a code to send to Claude, or paste a code to try it (like Try: clean start, nothing saved until you press Save).</p>
+        <textarea id="lookCode" rows="4" spellcheck="false" placeholder="ORB1 name=...; grad=1; ..." style="width:100%;font:500 0.8rem var(--mono);background:var(--panel-2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
+        <div class="btns"><button class="primary" id="lookImport">Try this code</button><button id="lookExport">Copy current look</button></div>
+      </details>
       <div class="rows" id="ideaList"></div>
     </div>
     <div class="card">
@@ -803,6 +808,38 @@ function applyIdea([name, , set, palName]) {
   if (palName) { pal = PAL_PRESETS[palName].map(x => [...x]); sendPalette(); pendingPal = palName; }
   quietSend = false; dirty = true; updateSaveBtn(); renderAll(); toast(name + ' - press Save to keep it in a preset');
 }
+// Look codes: "ORB1 name=X; key=value; ...; pal=pos:hue:sat,..." - only what differs from the defaults
+function lookCode() {
+  const parts = ['name=' + ((activeSlot >= 0 && slots[activeSlot]) ? slots[activeSlot].name : 'My look')];
+  Object.keys(vals).sort().forEach(k => {
+    if (DEVICE_KEYS.includes(k) || !(k in DEMO) || /^(set|rows|spots)/.test(k)) return;
+    if (Math.abs(+vals[k] - +DEMO[k]) > 1e-6) parts.push(k + '=' + +(+vals[k]).toFixed(4));
+  });
+  parts.push('pal=' + pal.map(([p, h, sa]) => `${(+p).toFixed(3)}:${Math.round(h)}:${Math.round(sa)}`).join(','));
+  return 'ORB1 ' + parts.join('; ');
+}
+function applyLookCode(text) {
+  const t = text.trim().replace(/^ORB1\s*/i, ''); if (!t) { toast('Paste a code first'); return; }
+  const set = {}; let name = 'Imported look', palStops = null, bad = [];
+  t.split(';').map(x => x.trim()).filter(Boolean).forEach(x => {
+    const i = x.indexOf('='); if (i < 0) { bad.push(x); return; }
+    const k = x.slice(0, i).trim(), v = x.slice(i + 1).trim();
+    if (k === 'name') name = v;
+    else if (k === 'pal') palStops = v.split(',').map(st => st.split(':').map(Number)).filter(a => a.length === 3 && a.every(n => !isNaN(n)));
+    else if (k in DEMO && !DEVICE_KEYS.includes(k) && !isNaN(+v)) set[k] = +v;
+    else bad.push(k);
+  });
+  quietSend = true; gettingAll = true; send('defaults nocal');
+  Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });
+  if (palStops && palStops.length >= 2) { pal = palStops; sendPalette(); }
+  quietSend = false; dirty = true; updateSaveBtn(); renderAll();
+  toast(name + (bad.length ? ` (skipped: ${bad.slice(0, 3).join(', ')})` : '') + ' - press Save to keep it');
+}
+$('lookImport').addEventListener('click', () => applyLookCode($('lookCode').value));
+$('lookExport').addEventListener('click', async () => {
+  const code = lookCode(); $('lookCode').value = code;
+  try { await navigator.clipboard.writeText(code); toast('Look copied - paste it to Claude'); } catch (e) { $('lookCode').select(); toast('Code is in the box - copy it from there'); }
+});
 IDEAS.forEach(idea => {
   const row = document.createElement('div'); row.className = 'fx-row';
   row.innerHTML = `<div class="grow"><h3>${idea[0]}</h3><p class="muted small">${idea[1]}</p></div><button class="small">Try</button>`;

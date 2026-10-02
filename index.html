@@ -340,7 +340,7 @@ select { width: auto; }
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
     <div class="card"><div class="card-head"><div class="grow"><h2>Demo song</h2><p class="muted small">The orb plays a made-up track into its own detection instead of the mic: calm, build-up, drop, groove, then a short silence, on a loop (about 2.5 minutes). For showing it off quietly or testing effects.</p></div>
       <label class="switch"><input type="checkbox" id="demoSong" aria-label="Demo song"><span></span></label></div><p class="small muted" id="demoSongState"></p></div>
-    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
+    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing, tempo recovery and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
       <h2>Remote</h2><p class="muted small">What each button on the Mr.Go remote does.</p>
       <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
@@ -503,8 +503,7 @@ const FX_CARDS = [
 ];
 const FEEL_DIPS = [
   S('dipdepth', 'Dip depth', 0, 0.95, 0.05, { fmt: pct }),
-  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms', hint: 'Used when Recovery follows the tempo is off.' }),
-  S('relbeats', 'Recovery follows the tempo', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '% of a beat (' + Math.round(v * 60000 / 165) + ' ms at 165, ' + Math.round(v * 60000 / 110) + ' ms at 110 BPM)', hint: 'Recovery as a share of each beat, so fast and slow songs both feel right.' }),
+  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms', hint: 'Only used when Setup → Global → Recovery follows the tempo is off.' }),
   S('depthslow', 'Shallower for slow music', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : 'up to ' + Math.round(v * 50) + '% less at 100 BPM', hint: 'Full depth from 140 BPM up; below that the dips get gentler.' }),
   S('kickdb', 'Kick sensitivity', 3, 12, 0.5, { ui: v => 15 - v, back: v => 15 - v, uiMin: 3, uiMax: 12, fmt: v => (15 - v).toFixed(1), hint: 'Higher = quieter kicks count.' }),
 ];
@@ -515,6 +514,7 @@ const FEEL_SING = [
   S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { fmt: pct }),
 ];
 const POWER = [                                        // global: the same for every preset, saved on the orb straight away
+  S('relbeats', 'Recovery follows the tempo', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '% of a beat', hint: 'How fast the bass pulse recovers, as a share of each beat, so fast and slow songs both feel right. 30% = about 110 ms at 160 BPM, 165 ms at 110 BPM. Off = each preset uses its own Recovery.' }),
   S('floor', 'Always-on floor', 0, 0.3, 0.01, { fmt: pct, hint: 'Minimum light while music plays. 0 lets quiet parts go dark.' }),
   S('sparse', 'Dim-glow smoothing', 0, 6, 1, { fmt: v => v < 2 ? 'off' : 'every ' + v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' LED', hint: 'At low light only every few LEDs carry it: smoother, less flicker.' }),
   S('ledma', 'Total power', 150, 750, 10, { fmt: v => v + ' mA', hint: 'For the LEDs. Capped at 750 mA: the board carries about 1 A and the ESP32 uses the rest.' }),
@@ -601,7 +601,7 @@ function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toas
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 let activeSlot = -1, dirty = false, quietSend = false;   // the preset the orb is on, and unsaved changes to it
-const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse'];
+const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats'];
 let editAll = false;                                   // 'Edit all presets' mode
 function updateSaveBtn() {
   const b = $('btnSave'), s = activeSlot >= 0 ? slots[activeSlot] : null;
@@ -783,11 +783,12 @@ $('gradFix').appendChild(slider(S('gspin', 'Colours travel', 0, 120, 1, { fmt: v
 // Ideas to try: full recipes on top of the defaults (see the Orb Feature Guide)
 const FX_OFF = Object.fromEntries(ALL_FX.map(k => [k, 0]));
 const IDEAS = [
-  ['Pearl pulse', 'Found 2 Oct: a blue-ish orb that fills with orange, green and a pink-red face on each bass note. Soft, pearly mixing rather than hard bands.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, grad: 1, gradsrc: 1, gh0: 160, gh1: 32, gh2: 96, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 0, gheat: 0, gbal: 0, bassh: 1, pump: 1, volfill: 0, zones: 1, zc0: 0.14, zc1: 0.28, zc2: 0.05, zc3: 0.2, dipdepth: 0.7, diprelease: 90 }],
+  ['Pearl shimmer', 'The Pearl look exactly, plus a gentle shimmer: each turn breathes a little with its own sound, and tiny pale glints sparkle on the hi-hats. Calm and glowing, no big moves.', { ...LOOKS['Pearl'], ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, bright: 120, dipdepth: 0.25, gdrive: 2, bandmin: 0.6, hatgain: 1.5, hats: 1, col_hat: 2, hue_hat: 224, sat_hat: 40 }],
+  ['Pearl pulse', 'The soft Pearl colours (blue, pink, amber, teal) with Ben\'s tuned pulse: each bass note fills the ball up to a pink face, colours slowly travel above a steady blue base, pink ripple and spin, teal claps, a quiet singer. Tuned for fast bounce.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_singer: 1, fx_claps: 1, fx_spin: 1, fx_ripple: 1, grad: 1, gradsrc: 1, gh0: 160, gh1: 32, gh2: 112, gh3: 224, gs0: 170, gs1: 170, gs2: 170, gs3: 170, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 40, gheat: 0.5, gbal: 0, bassh: 1, pump: 1, volfill: 0, gbuild: 1, zones: 1, zscale: 1, zc0: 0.28, zc1: 0.56, zc2: 0.05, zc3: 0.28, dipdepth: 0.7, diprelease: 90, depthslow: 0, eyesing: 25, clapgain: 1, clapdb: 3, col_clap: 2, hue_clap: 112, sat_clap: 170, spinbeats: 2, spinturns: 1, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 220, sat_spin: 121, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 224, sat_ripple: 81 }],
   ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter. The face is the opposite colour, so you see when the light reaches it.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Contrast'], bassh: 1, pump: 1, volfill: 1, dipdepth: 0.6, bright: 150 }],
   ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7, bright: 110 }],
   ['Spotlight dancer', 'A dim warm ball where a white dancer and the sparks do the work. Best in a dark room.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30, col_eye: 2, hue_eye: 0, sat_eye: 0, bright: 140 }, 'Ember'],
-  ['Equaliser', 'Bass thumps the base, hats twinkle at the face.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, bright: 150, grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, zones: 1, gbal: 1 }],
+  ['Equaliser', 'Toxic acid look: bass thumps the base, hats twinkle at the face, quiet turns go dark. Aqua claps and ripple, a lime spin, all kept under the bands.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_claps: 1, fx_ripple: 1, fx_sling: 1, fx_spin: 1, bright: 150, grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, bandmin: 0, zones: 1, gbal: 1, clapgain: 1.5, col_clap: 2, hue_clap: 128, sat_clap: 200, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 128, sat_ripple: 180, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 72, sat_spin: 200 }],
   ['Pearl lounge', 'A slow mother-of-pearl shimmer for chilling.', { ...LOOKS['Pearl'], ...FX_OFF, fx_dips: 1, fx_sing: 1, dipdepth: 0.25, bright: 120 }],
   ['Build rocket', 'Build-ups climb from the base and burst at the drop. Contrast colours, so the climb to the face shows.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_roll: 1, fx_sling: 1, fx_ripple: 1, ...LOOKS['Contrast'], gbuild: 1, fx_roll: 1, sling: 0.6, bright: 150 }],
   ['Garage drift', 'Slow colour movement for long drones and sustained bass.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.3 }],
@@ -1494,7 +1495,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
-  relbeats: 0, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
+  relbeats: 0.3, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
   gdrive: 0, revrange: 12, revmin: 0.25, revrel: 250, bandmin: 0.2, gbuild: 1, lampgrad: 0, lamphue2: 200, lampsat2: 200,
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,

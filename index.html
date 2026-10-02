@@ -245,7 +245,7 @@ select { width: auto; }
       <div class="rows" id="presetEditor" hidden></div>
     </div>
     <div class="card">
-      <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">Complete looks built on the new features. Each starts from clean defaults (power and calibration kept) and sets everything it needs. Nothing is saved until you press Save at the top.</p></div></div>
+      <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">Complete looks built on the new features. Each starts from clean defaults (power and calibration kept), turns off every effect it isn't about, and sets its own colours and brightness. Nothing is saved until you press Save at the top.</p></div></div>
       <div class="rows" id="ideaList"></div>
     </div>
     <div class="card">
@@ -767,15 +767,15 @@ $('gradFix').appendChild(slider(S('gspin', 'Colours travel', 0, 120, 1, { fmt: v
 // Ideas to try: full recipes on top of the defaults (see the Orb Feature Guide)
 const FX_OFF = Object.fromEntries(ALL_FX.map(k => [k, 0]));
 const IDEAS = [
-  ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter.', { bassh: 1, pump: 1, volfill: 1, zones: 1, dipdepth: 0.6 }],
-  ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7 }],
-  ['Spotlight dancer', 'A dark ball where the dancer and sparks do the work. Best in a dark room.', { zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30 }],
-  ['Equaliser', 'Bass thumps the base, hats twinkle at the face.', { grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, zones: 1, gbal: 1 }],
+  ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter. The face is the opposite colour, so you see when the light reaches it.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Contrast'], bassh: 1, pump: 1, volfill: 1, dipdepth: 0.6, bright: 150 }],
+  ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7, bright: 110 }],
+  ['Spotlight dancer', 'A dim warm ball where a white dancer and the sparks do the work. Best in a dark room.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30, col_eye: 2, hue_eye: 0, sat_eye: 0, bright: 140 }, 'Ember'],
+  ['Equaliser', 'Bass thumps the base, hats twinkle at the face.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, bright: 150, grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, zones: 1, gbal: 1 }],
   ['Pearl lounge', 'A slow mother-of-pearl shimmer for chilling.', { ...LOOKS['Pearl'], ...FX_OFF, fx_dips: 1, fx_sing: 1, dipdepth: 0.25, bright: 120 }],
-  ['Build rocket', 'Build-ups climb from the base and burst at the drop.', { zones: 1, gbuild: 1, fx_roll: 1, sling: 0.6 }],
-  ['Garage drift', 'Slow colour movement for long drones and sustained bass.', { grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.3 }],
-  ['Contrast face', 'The face always in the opposite colour to the body.', { ...LOOKS['Contrast'], fx_singer: 1 }],
-  ['Rave', 'Big colour jumps and hard pulses.', { partyrange: 9, pump: 1, dipdepth: 0.85, zones: 0 }, 'Neon'],
+  ['Build rocket', 'Build-ups climb from the base and burst at the drop. Contrast colours, so the climb to the face shows.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_roll: 1, fx_sling: 1, fx_ripple: 1, ...LOOKS['Contrast'], gbuild: 1, fx_roll: 1, sling: 0.6, bright: 150 }],
+  ['Garage drift', 'Slow colour movement for long drones and sustained bass.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.3 }],
+  ['Contrast face', 'The face always in the opposite colour to the body.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_singer: 1, ...LOOKS['Contrast'], fx_singer: 1 }],
+  ['Rave', 'Big colour jumps and hard pulses.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_party: 1, fx_sparkles: 1, fx_ripple: 1, partyrange: 9, pump: 1, dipdepth: 0.85, zones: 0 }, 'Neon'],
   ['Candle (lamp)', 'A warm two-tone light with slow breathing. No music needed.', { mode: 1, lampgrad: 1, lamphue: 20, lampsat: 255, lamphue2: 0, lampsat2: 255, lampbreathe: 1, lampbright: 90 }],
 ];
 function applyIdea([name, , set, palName]) {

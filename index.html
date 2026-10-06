@@ -473,14 +473,15 @@ const COLOUR = [
 ];
 const PARTY = [
   S('partychance', 'Chance per drop', 0, 1, 0.05, { fmt: pct }),
+  S('dropsnap', 'Always after a build-up', 0, 1, 1, { fmt: v => +v ? 'On' : 'Off', hint: 'On: a drop that follows a build-up always gets the party jump. Other drops use the chance above.' }),
   S('partyhold', 'Each colour holds', 8, 128, 8, { fmt: v => v + ' beats' }),
 ];
 const FX_CARDS = [
-  { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the dancer and the flood.', toggle: 'fx_singer', col: 'eye', autoDesc: "the glow's opposite colour", items: [
+  { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the flood, and with the dancer unless the dancer has its own.', toggle: 'fx_singer', col: 'eye', autoDesc: "the glow's opposite colour", items: [
     S('eyesing', 'Brightness', 10, 150, 1),
     S('cap', 'Glow limit behind the eye', 20, 255, 1, { adv: true, hint: 'Lower = the eye stands out more, the rest of the orb dims. Also used by the dancer.' }) ] },
   { title: 'Big vocal flood', sub: 'Rare: a loud held vocal line swells the eye. Colour: see Singer.', toggle: 'fx_flood', trig: 'flood', items: [ S('floodbright', 'Flood brightness', 40, 255, 1) ] },
-  { title: 'Dancer', sub: 'The eye head-bangs to the beat in drops and grooves. Colour: see Singer.', toggle: 'fx_dancer', trig: 'stage', items: [
+  { title: 'Dancer', sub: 'The eye head-bangs to the beat in drops and grooves.', toggle: 'fx_dancer', trig: 'stage', col: 'dancer', autoDesc: "the glow's opposite colour", items: [
     S('eyebang', 'Brightness', 10, 150, 1),
     ] },
   { title: 'Clap sparks', sub: 'Top left and right, on the backbeat once the clap grid locks.', toggle: 'fx_claps', trig: 'clap', col: 'clap', autoDesc: "the glow colour's neighbour (accent)", items: [
@@ -689,7 +690,7 @@ function colourRow(e, autoDesc) {
   const box = document.createElement('div'); box.className = 'rows'; box.style.borderTop = '1px solid var(--line)'; box.style.paddingTop = '12px';
   const head = document.createElement('div'); head.className = 'card-head';
   head.innerHTML = `<div class="grow"><h3>Colour</h3><p class="muted small" data-desc></p></div><span class="swatch" data-sw title="Colour on the current glow"></span>
-    <div class="seg"><button data-m="0">Auto</button><button data-m="1">Shift</button><button data-m="2">Fixed</button><button data-m="3">Swap</button></div>`;
+    <div class="seg">${e === 'dancer' ? '<button data-m="-1">Singer</button>' : ''}<button data-m="0">Auto</button><button data-m="1">Shift</button><button data-m="2">Fixed</button><button data-m="3">Swap</button></div>`;
   box.appendChild(head);
   const sh = slider(S('shift_' + e, 'Shift from the glow colour', -128, 128, 1, { hint: 'Moves round the colour wheel from whatever the glow is showing, so it suits every palette.' }));
   const hu = slider(S('hue_' + e, 'Colour', 0, 255, 1, { hue: true }));
@@ -702,13 +703,13 @@ function colourRow(e, autoDesc) {
   return box;
 }
 function renderColourRow(r) {
-  const m = +(vals['col_' + r.e] ?? 0);
+  const m = +(vals['col_' + r.e] ?? (r.e === 'dancer' ? -1 : 0));
   r.head.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.m === m)));
-  r.sh.hidden = m !== 1; r.hu.hidden = m !== 2; r.sa.hidden = m === 0 || m === 3;
-  r.head.querySelector('[data-desc]').textContent = m === 0 ? 'Auto: ' + r.autoDesc + '.' : m === 1 ? 'Follows the glow, shifted round the wheel.' : m === 3 ? 'Palette swap: the palette colour from its other half (low glow gets a high colour and back).' : 'Always this colour.';
+  r.sh.hidden = m !== 1; r.hu.hidden = m !== 2; r.sa.hidden = m <= 0 || m === 3;
+  r.head.querySelector('[data-desc]').textContent = m === -1 ? 'Same colour as the singer.' : m === 0 ? 'Auto: ' + r.autoDesc + '.' : m === 1 ? 'Follows the glow, shifted round the wheel.' : m === 3 ? 'Palette swap: the palette colour from its other half (low glow gets a high colour and back).' : 'Always this colour.';
   const g = currentHue, sat = vals['sat_' + r.e] ?? 255;
   const sw = r.head.querySelector('[data-sw]');
-  sw.style.background = m === 3 ? gradient(pal.length ? pal : PAL_PRESETS['Club Light']) : m === 0 ? 'repeating-linear-gradient(45deg, var(--panel-2) 0 4px, var(--line) 4px 8px)' : m === 1 ? css(g + (vals['shift_' + r.e] ?? 0), sat) : css(vals['hue_' + r.e] ?? 0, sat);
+  sw.style.background = m === 3 ? gradient(pal.length ? pal : PAL_PRESETS['Club Light']) : m <= 0 ? 'repeating-linear-gradient(45deg, var(--panel-2) 0 4px, var(--line) 4px 8px)' : m === 1 ? css(g + (vals['shift_' + r.e] ?? 0), sat) : css(vals['hue_' + r.e] ?? 0, sat);
 }
 
 // ---------------- Build the tabs ----------------
@@ -1536,7 +1537,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,
   col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
-  col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0 };
+  col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0, col_dancer: -1, hue_dancer: 0, sat_dancer: 0, shift_dancer: 0, dropsnap: 1 };
 function startDemo() {
   const st = { ...DEMO }, demoSlots = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
   const reply = (l) => setTimeout(() => onLine(l), 5);

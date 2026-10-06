@@ -496,6 +496,7 @@ const FX_CARDS = [
     S('glitter', 'Dots', 0, 16, 1, { fmt: v => +v ? String(+v) : 'Off' }),
     S('glitmode', 'Style', 0, 1, 1, { fmt: v => +v ? 'Embers: rise and burn out' : 'Mirror ball: drift round and twinkle' }),
     S('glitspeed', 'Speed', 0, 2, 0.05, { fmt: v => (+v).toFixed(2) + ' turns/s' }),
+    S('glitrise', 'Embers rise', 0.2, 1, 0.05, { fmt: v => Math.round(v * 100) + '% of the way up', hint: 'Embers only. Lower = they burn out lower down, where they stay small and sharp.' }),
     S('glitlen', 'Length', 1, 10, 1, { fmt: v => +v === 1 ? 'Dots' : v + ' LEDs', hint: 'Longer = flowing lines with a fading tail.' }),
     S('glitgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
     S('glitclap', 'Flare on claps', 0, 1, 0.05, { fmt: pct }) ] },
@@ -1536,7 +1537,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   moodscale: 0.8, coloursmooth: 0.0025, warmth: 0.7, warmin: 0.01, warmout: 0.0012, pastel: 170, wobble: 0.03, idlehue: 112, accent: 36,
   partyrange: 1, partychance: 0.6, partyhold: 32, eyesing: 38, pitch: 1, sidemax: 1, open: 0.75, spring: 250, floodbright: 150,
   chance: 0.6, eyebang: 38, bop: 5, springlo: 150, springhi: 400, swaylo: 0.3, swayhi: 1, fadeout: 4, cap: 70, coolgain: 3,
-  clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
+  clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.3, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
   relbeats: 0.3, levelrise: 8000, nodlead: 1, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
@@ -1545,7 +1546,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,
   col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
   col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0, col_dancer: -1, hue_dancer: 0, sat_dancer: 0, shift_dancer: 0, dropsnap: 1,
-  glitter: 0, glitmode: 0, glitspeed: 0.15, glitlen: 1, glitgain: 3, glitclap: 0.5, col_glitter: 0, hue_glitter: 24, sat_glitter: 70, shift_glitter: 0 };
+  glitter: 0, glitmode: 0, glitspeed: 0.15, glitlen: 1, glitrise: 1, glitgain: 3, glitclap: 0.5, col_glitter: 0, hue_glitter: 24, sat_glitter: 70, shift_glitter: 0 };
 function startDemo() {
   const st = { ...DEMO }, demoSlots = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
   const reply = (l) => setTimeout(() => onLine(l), 5);

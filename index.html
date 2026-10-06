@@ -496,6 +496,7 @@ const FX_CARDS = [
     S('glitter', 'Dots', 0, 16, 1, { fmt: v => +v ? String(+v) : 'Off' }),
     S('glitmode', 'Style', 0, 1, 1, { fmt: v => +v ? 'Embers: rise and burn out' : 'Mirror ball: drift round and twinkle' }),
     S('glitspeed', 'Speed', 0, 2, 0.05, { fmt: v => (+v).toFixed(2) + ' turns/s' }),
+    S('glitfrom', 'Embers start', 0, 1, 0.05, { fmt: v => +v == 0 ? 'at the bottom' : +v == 1 ? 'at the tip of the light' : Math.round(v * 100) + '% up to the tip', hint: 'Embers only. The tip moves with Bass height and Volume fills the orb, like sparks breaking off a flame.' }),
     S('glitrise', 'Embers rise', 0.2, 1, 0.05, { fmt: v => Math.round(v * 100) + '% of the way up', hint: 'Embers only. Lower = they burn out lower down, where they stay small and sharp.' }),
     S('glitlen', 'Length', 1, 10, 1, { fmt: v => +v === 1 ? 'Dots' : v + ' LEDs', hint: 'Longer = flowing lines with a fading tail.' }),
     S('glitgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
@@ -812,7 +813,8 @@ const IDEAS = [
 function applyIdea([name, , set, palName]) {
   quietSend = true; gettingAll = true; send('defaults nocal');           // clean start: earlier fiddling can't leak in
   Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });
-  if (palName) { pal = PAL_PRESETS[palName].map(x => [...x]); sendPalette(); pendingPal = palName; }
+  if (palName) { pal = PAL_PRESETS[palName].map(x => [...x]); sendPalette(); }
+  pendingImport = { set, pal: palName ? PAL_PRESETS[palName] : null };   // the reset's reply would overwrite these in the app
   quietSend = false; dirty = true; updateSaveBtn(); renderAll(); toast(name + ' - press Save to keep it in a preset');
 }
 // Look codes: "ORB1 name=X; key=value; ...; pal=pos:hue:sat,..." - only what differs from the defaults
@@ -839,6 +841,7 @@ function applyLookCode(text) {
   quietSend = true; gettingAll = true; send('defaults nocal');
   Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });
   if (palStops && palStops.length >= 2) { pal = palStops; sendPalette(); }
+  pendingImport = { set, pal: palStops && palStops.length >= 2 ? palStops : null };   // the reset's reply would overwrite these in the app
   quietSend = false; dirty = true; updateSaveBtn(); renderAll();
   toast(name + (bad.length ? ` (skipped: ${bad.slice(0, 3).join(', ')})` : '') + ' - press Save to keep it');
 }
@@ -1384,6 +1387,11 @@ function onLine(line) {
     case 'end':
       gettingAll = false;
       if (pendingPal) { pal = PAL_PRESETS[pendingPal].map(s => [...s]); pendingPal = null; }   // the reset's reply carried the default palette
+      if (pendingImport) {                                               // a pasted code or idea: put its values and palette back
+        Object.assign(vals, pendingImport.set);                          //  (the reset's reply arrived after them and showed defaults)
+        if (pendingImport.pal) { pal = pendingImport.pal.map(s => [...s]); sendPalette(); }
+        pendingImport = null;
+      }
       renderAll(); break;
     case 'S': {
       const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
@@ -1405,7 +1413,7 @@ function onLine(line) {
   if (w[0] === 'ok' && (w[1] === 'pload' || w[1] === 'psave')) { if (w[1] === 'pload') gettingAll = true; activeSlot = +w[2]; dirty = false; updateSaveBtn(); }
   if (w[0] === 'cur') { activeSlot = +w[1]; updateSaveBtn(); }
 }
-let gettingAll = false, demoTimer = null, pendingPal = null, pendingPin = null, newPinPending = null;
+let gettingAll = false, demoTimer = null, pendingPal = null, pendingImport = null, pendingPin = null, newPinPending = null;
 function loadPin() { try { return localStorage.getItem('orbPin') || ''; } catch (e) { return ''; } }
 function savePin(p) { if (!p) return; try { localStorage.setItem('orbPin', p); } catch (e) {} }
 function showPin(msg) { $('pinBox').hidden = false; if (msg) $('pinMsg').textContent = msg; $('pinIn').value = ''; $('pinIn').focus(); }
@@ -1546,7 +1554,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,
   col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
   col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0, col_dancer: -1, hue_dancer: 0, sat_dancer: 0, shift_dancer: 0, dropsnap: 1,
-  glitter: 0, glitmode: 0, glitspeed: 0.15, glitlen: 1, glitrise: 1, glitgain: 3, glitclap: 0.5, col_glitter: 0, hue_glitter: 24, sat_glitter: 70, shift_glitter: 0 };
+  glitter: 0, glitmode: 0, glitspeed: 0.15, glitlen: 1, glitrise: 1, glitfrom: 0, glitgain: 3, glitclap: 0.5, col_glitter: 0, hue_glitter: 24, sat_glitter: 70, shift_glitter: 0 };
 function startDemo() {
   const st = { ...DEMO }, demoSlots = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
   const reply = (l) => setTimeout(() => onLine(l), 5);

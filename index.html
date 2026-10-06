@@ -345,7 +345,7 @@ select { width: auto; }
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
     <div class="card"><div class="card-head"><div class="grow"><h2>Demo song</h2><p class="muted small">The orb plays a made-up track into its own detection instead of the mic: calm, build-up, drop, groove, then a short silence, on a loop (about 2.5 minutes). For showing it off quietly or testing effects.</p></div>
       <label class="switch"><input type="checkbox" id="demoSong" aria-label="Demo song"><span></span></label></div><p class="small muted" id="demoSongState"></p></div>
-    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing, tempo recovery and power are the same for every preset. Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
+    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing, tempo recovery, loudness adjustment, dancer timing and power are the same for every preset (so is Sensitivity on Home). Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
       <h2>Remote</h2><p class="muted small">What each button on the Mr.Go remote does.</p>
       <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
@@ -434,7 +434,7 @@ const pct = (v) => Math.round(v * 100) + '%';
 
 const HOME = [
   S('bright', 'Brightness', 20, 255, 1, { fmt: v => Math.round(v / 2.55) + '%' }),
-  S('headroom', 'Sensitivity', 2, 14, 0.5, { ui: v => 16 - v, back: v => 16 - v, uiMin: 2, uiMax: 14, fmt: v => (16 - v).toFixed(1), hint: 'Higher = the orb gets brighter at lower volumes.' }),
+  S('headroom', 'Sensitivity', 2, 14, 0.5, { ui: v => 16 - v, back: v => 16 - v, uiMin: 2, uiMax: 14, fmt: v => (16 - v).toFixed(1), hint: 'Higher = the orb gets brighter at lower volumes. Same for every preset (set it per room).' }),
 ];
 const LAMP = [
   S('lamphue', 'Colour', 0, 255, 1, { hue: true }),
@@ -446,7 +446,7 @@ const GRAD_PAL = [ S('gradspread', 'Spread', 0, 1.5, 0.05, { fmt: v => v.toFixed
 const GRAD_FIX = [3, 2, 1, 0].flatMap(k => [ S('gh' + k, TURNS[k] + ' colour', 0, 255, 1, { hue: true }), S('gs' + k, TURNS[k] + ' saturation', 0, 255, 1) ]);
 const GRAD_BR = [3, 2, 1, 0].map(k => S('gb' + k, TURNS[k], 0, 1, 0.05, { fmt: pct }));
 const ZONE_SCALE = S('zscale', 'Zone brightness', 0.25, 4, 0.05, { fmt: v => '×' + v.toFixed(2), hint: 'Scales all four ceilings together, keeping their balance. Raise it until the bass hits stop looking like a change, then back off.' });
-const ZONE_CAPS = [3, 2, 1, 0].map(k => S('zc' + k, ['Bottom (background)', 'Lower', 'Upper', 'Face'][k] + ' ceiling', 0.02, 1, 0.01, { fmt: pct }));
+const ZONE_CAPS = [3, 2, 1, 0].map(k => S('zc' + k, ['Bottom (background)', 'Lower', 'Upper', 'Face'][k] + ' ceiling', 0.02, 1, 0.01, { adv: true, fmt: pct }));
 const GRAD_BAND = [ S('bandmin', 'Quiet turn keeps', 0, 1, 0.05, { fmt: pct, hint: 'Light left on a turn whose band is quiet.' }) ];
 const FX = [
   ['fx_dips', 'Bass dips', 'The pulse: the glow dips with the bass.', null],
@@ -464,14 +464,11 @@ const FX = [
   ['fx_party', 'Party mode', 'Long drops change colour every so often.', 'party'],
 ];
 const COLOUR = [
-  S('moodscale', 'How far bass moves the colour', 0.2, 1.5, 0.05, { fmt: v => v.toFixed(2) }),
+  S('moodscale', 'How far bass moves the colour', 0.2, 1.5, 0.05, { adv: true, fmt: v => v.toFixed(2) }),
   S('coloursmooth', 'Colour follows the music over', 1, 30, 0.5, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(1) + ' s', hint: 'Longer = the colour holds steadier.' }),
-  S('warmth', 'How much drops warm the colour', 0, 1.2, 0.05, { fmt: v => v.toFixed(2) }),
-  S('warmin', 'Drops warm up over', 0.3, 8, 0.1, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(1) + ' s' }),
-  S('warmout', 'Then cool down over', 2, 50, 0.5, { ui: secs, back: fromSecs, fmt: v => secs(v).toFixed(0) + ' s' }),
-  S('pastel', 'Build-up pastel fade', 0, 200, 5, { fmt: v => Math.round(v / 2) + '%' }),
-  S('wobble', 'Slow drift', 0, 0.15, 0.005, { fmt: v => v.toFixed(3) }),
-  S('accent', 'Accent colour (auto)', -80, 80, 1, { accent: true, hint: 'Claps and the spin on Auto use the glow colour shifted this far. Each effect can also get its own colour on the Effects tab.' }),
+  S('warmth', 'How much drops warm the colour', 0, 1.2, 0.05, { adv: true, fmt: v => v.toFixed(2) }),
+  S('pastel', 'Build-up pastel fade', 0, 200, 5, { adv: true, fmt: v => Math.round(v / 2) + '%' }),
+  S('wobble', 'Slow drift', 0, 0.15, 0.005, { adv: true, fmt: v => v.toFixed(3) }),
   S('idlehue', 'Idle breathing colour', -1, 255, 1, { hue: true, hint: 'Shown after a few seconds of silence. Far left keeps the last colour.' }),
 ];
 const PARTY = [
@@ -480,46 +477,40 @@ const PARTY = [
 ];
 const FX_CARDS = [
   { title: 'Singer', sub: 'The eye in calm and vocal parts. Its colour is shared with the dancer and the flood.', toggle: 'fx_singer', col: 'eye', autoDesc: "the glow's opposite colour", items: [
-    S('eyesing', 'Brightness', 10, 150, 1), S('pitch', 'Up / down range', 0, 1.5, 0.05, { fmt: v => v.toFixed(2) + ' turns' }),
-    S('sidemax', 'Sideways lean', 0, 2, 0.1, { fmt: v => v.toFixed(1) + ' LEDs' }), S('open', 'Opens with the voice', 0, 2, 0.05, { fmt: v => v.toFixed(2) }),
-    S('spring', 'Snappiness', 20, 1000, 10, { hint: 'Low = floaty, high = sharp.' }) ] },
+    S('eyesing', 'Brightness', 10, 150, 1),
+    S('cap', 'Glow limit behind the eye', 20, 255, 1, { adv: true, hint: 'Lower = the eye stands out more, the rest of the orb dims. Also used by the dancer.' }) ] },
   { title: 'Big vocal flood', sub: 'Rare: a loud held vocal line swells the eye. Colour: see Singer.', toggle: 'fx_flood', trig: 'flood', items: [ S('floodbright', 'Flood brightness', 40, 255, 1) ] },
   { title: 'Dancer', sub: 'The eye head-bangs to the beat in drops and grooves. Colour: see Singer.', toggle: 'fx_dancer', trig: 'stage', items: [
-    S('chance', 'Chance per drop', 0, 1, 0.05, { fmt: pct }), S('eyebang', 'Brightness', 10, 150, 1),
-    S('bop', 'Nod size', 0, 10, 0.5), S('springlo', 'Snappiness when warm', 20, 1000, 10), S('springhi', 'Snappiness when hot', 20, 1000, 10),
-    S('swaylo', 'Sway when warm', 0, 2, 0.1), S('swayhi', 'Sway when hot', 0, 2, 0.1),
-    S('fadeout', 'Fade-out when leaving', 0.5, 16, 0.5, { fmt: v => v + ' beats' }) ] },
-  { title: 'Eye contrast', sub: 'Shared by the singer and the dancer.', items: [
-    S('cap', 'Glow limit behind the eye', 20, 255, 1, { hint: 'Lower = the eye stands out more, the rest of the orb dims.' }),
-    S('coolgain', 'Colour boost', 0.5, 6, 0.1, { fmt: v => '×' + v.toFixed(1), hint: 'A coloured eye needs more light than a white one to show the same.' }) ] },
+    S('eyebang', 'Brightness', 10, 150, 1),
+    ] },
   { title: 'Clap sparks', sub: 'Top left and right, on the backbeat once the clap grid locks.', toggle: 'fx_claps', trig: 'clap', col: 'clap', autoDesc: "the glow colour's neighbour (accent)", items: [
-    S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }), S('clapdb', 'Lock sensitivity', 0.5, 8, 0.5, { fmt: v => v + ' dB', hint: 'Lower = locks onto claps more easily.' }) ] },
+    S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }), ] },
   { title: 'Hat sparks', sub: 'Bottom sides, on the off-beats once the hat grid locks.', toggle: 'fx_hats', trig: 'hat', col: 'hat', autoDesc: 'warm white', items: [
     S('hats', 'Sparks per side', 1, 3, 1), S('hatgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
-    S('hatdb', 'Lock sensitivity', 0.5, 6, 0.5, { fmt: v => v + ' dB', hint: 'Lower = locks onto hats more easily.' }) ] },
-  { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [ S('roll', 'Strength', 0, 1.5, 0.05, { fmt: pct }) ] },
+    ] },
+  { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [ ] },
   { title: 'Drop sparkles', sub: 'Busy drums in drops.', toggle: 'fx_sparkles', trig: 'sparkle', col: 'spark', autoDesc: 'the glow colour, a little warmer and richer', items: [
-    S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }), S('sparkbusy', 'Drums needed', 0.5, 3, 0.1, { fmt: v => v.toFixed(1) + ' hits/beat' }) ] },
+    S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }), ] },
   { title: 'Drop-end spin', sub: 'A bright side sweeps round as a drop ends.', toggle: 'fx_spin', trig: 'spin', col: 'spin', autoDesc: "the glow's opposite colour", items: [
-    S('spinbeats', 'Duration', 0.5, 16, 0.5, { fmt: v => v + ' beats' }), S('spinturns', 'Turns', 0.25, 8, 0.25),
+    S('spinbeats', 'Duration', 0.5, 16, 0.5, { adv: true, fmt: v => v + ' beats' }), S('spinturns', 'Turns', 0.25, 8, 0.25, { adv: true }),
     S('spingain', 'Brightness', 1, 16, 0.5, { fmt: v => '×' + v }), S('spindim', 'Dims the rest', 0, 1, 0.05, { fmt: pct }) ] },
   { title: 'Drop ripple and slingshot', sub: 'When the drop lands.', toggle: 'fx_ripple', trig: 'ripple', col: 'ripple', autoDesc: 'a brighter glow colour', items: [
     S('ripplegain', 'Ripple brightness', 0, 10, 0.5, { fmt: v => '×' + v }), S('sling', 'Slingshot colour push', 0, 0.6, 0.05, { fmt: v => v.toFixed(2) }) ] },
 ];
 const FEEL_DIPS = [
   S('dipdepth', 'Dip depth', 0, 0.95, 0.05, { fmt: pct }),
-  S('diprelease', 'Recovery', 20, 300, 5, { fmt: v => v + ' ms', hint: 'Only used when Setup → Global → Recovery follows the tempo is off.' }),
-  S('depthslow', 'Shallower for slow music', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : 'up to ' + Math.round(v * 50) + '% less at 100 BPM', hint: 'Full depth from 140 BPM up; below that the dips get gentler.' }),
-  S('kickdb', 'Kick sensitivity', 3, 12, 0.5, { ui: v => 15 - v, back: v => 15 - v, uiMin: 3, uiMax: 12, fmt: v => (15 - v).toFixed(1), hint: 'Higher = quieter kicks count.' }),
+  S('diprelease', 'Recovery', 20, 300, 5, { adv: true, fmt: v => v + ' ms', hint: 'Only used when Setup → Global → Recovery follows the tempo is off.' }),
+  S('depthslow', 'Shallower for slow music', 0, 1, 0.05, { adv: true, fmt: v => v == 0 ? 'off' : 'up to ' + Math.round(v * 50) + '% less at 100 BPM', hint: 'Full depth from 140 BPM up; below that the dips get gentler.' }),
 ];
 const FEEL_SING = [
-  S('singmin', 'Singing: quietest point', 0, 1, 0.05, { fmt: pct }),
-  S('singceil', 'Singing: brightest point', 0.2, 1, 0.05, { fmt: pct, hint: 'Keeps calm parts below the drops.' }),
-  S('singdrift', 'Melody colour drift', 0, 0.3, 0.01, { fmt: v => v.toFixed(2) }),
-  S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { fmt: pct }),
+  S('singmin', 'Singing: quietest point', 0, 1, 0.05, { adv: true, fmt: pct }),
+  S('singceil', 'Singing: brightest point', 0.2, 1, 0.05, { adv: true, fmt: pct, hint: 'Keeps calm parts below the drops.' }),
+  S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { adv: true, fmt: pct }),
 ];
 const POWER = [                                        // global: the same for every preset, saved on the orb straight away
   S('relbeats', 'Recovery follows the tempo', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '% of a beat', hint: 'How fast the bass pulse recovers, as a share of each beat, so fast and slow songs both feel right. 30% = about 110 ms at 160 BPM, 165 ms at 110 BPM. Off = each preset uses its own Recovery.' }),
+  S('levelrise', 'Louder music: adjust over', 1000, 20000, 500, { fmt: v => (v / 1000).toFixed(1) + ' s', hint: 'When the music gets louder, the orb takes this long to treat it as the new normal. Longer = drops stay at full brightness for longer. Was 2.5 s before 6 Oct.' }),
+  S('nodlead', 'Dancer timing', 0, 2, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '%', hint: 'The dancer starts each nod early so it lands on the beat. 100% = the calculated amount; lower if it looks early, higher if it still looks late.' }),
   S('floor', 'Always-on floor', 0, 0.3, 0.01, { fmt: pct, hint: 'Minimum light while music plays. 0 lets quiet parts go dark.' }),
   S('sparse', 'Dim-glow smoothing', 0, 6, 1, { fmt: v => v < 2 ? 'off' : 'every ' + v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' LED', hint: 'At low light only every few LEDs carry it: smoother, less flicker.' }),
   S('ledma', 'Total power', 150, 750, 10, { fmt: v => v + ' mA', hint: 'For the LEDs. Capped at 750 mA: the board carries about 1 A and the ESP32 uses the rest.' }),
@@ -606,7 +597,7 @@ function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toas
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 let activeSlot = -1, dirty = false, quietSend = false;   // the preset the orb is on, and unsaved changes to it
-const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats'];
+const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats', 'headroom', 'levelrise', 'nodlead'];
 let editAll = false;                                   // 'Edit all presets' mode
 function updateSaveBtn() {
   const b = $('btnSave'), s = activeSlot >= 0 ? slots[activeSlot] : null;
@@ -730,8 +721,7 @@ GRAD_BAND.forEach(d => $('gradBand').appendChild(slider(d)));
 $('heightToggles').appendChild(toggle('volfill', 'Volume fills the orb', 'Quiet parts light only the bottom, loud parts reach all the way to the face.', null));
 $('heightToggles').appendChild(toggle('gbuild', 'Build-ups climb', 'As a build-up gets more intense, the light climbs to the face.', null));
 $('heightToggles').appendChild(toggle('zones', 'Keep the zones separate', 'Each turn stays below its ceiling, so the areas of the ball keep their own colour instead of washing together.', null));
-$('zoneCaps').appendChild(slider(ZONE_SCALE));
-ZONE_CAPS.forEach(d => $('zoneCaps').appendChild(slider(d)));
+addRows($('zoneCaps'), [ZONE_SCALE, ...ZONE_CAPS]);
 document.querySelectorAll('#gradSeg button').forEach(b => b.addEventListener('click', () => {
   const g = +b.dataset.g; vals.grad = g ? 1 : 0; send('set grad ' + vals.grad);
   if (g) { vals.gradsrc = { 1: 0, 2: 1, 3: 2 }[g]; send('set gradsrc ' + vals.gradsrc); }
@@ -751,11 +741,20 @@ $('lampCtl').appendChild(toggle('lampgrad', 'Two colours', 'Fades from the colou
   [S('lamphue2', 'Top colour', 0, 255, 1, { hue: true }), S('lampsat2', 'Top saturation', 0, 255, 1)].forEach(d => box.appendChild(slider(d)));
   $('lampCtl').appendChild(box); }
 FX.forEach(([k, l, d, t]) => $('fxList').appendChild(toggle(k, l, d, t)));
-COLOUR.forEach(d => $('colourCtl').appendChild(slider(d)));
-PARTY.forEach(d => $('partyCtl').appendChild(slider(d)));
-FEEL_DIPS.forEach(d => $('feelDips').appendChild(slider(d)));
-FEEL_SING.forEach(d => $('feelSing').appendChild(slider(d)));
-POWER.forEach(d => $('powerBox').appendChild(slider(d)));
+// Sliders into a box; ones marked adv go into a folded 'Advanced' section at the end (rarely needed for presets)
+function addRows(box, defs) {
+  defs.filter(d => !d.adv).forEach(d => box.appendChild(slider(d)));
+  const adv = defs.filter(d => d.adv); if (!adv.length) return;
+  const det = document.createElement('details'); det.className = 'sub';
+  det.innerHTML = '<summary>Advanced</summary>';
+  const inner = document.createElement('div'); inner.className = 'rows';
+  adv.forEach(d => inner.appendChild(slider(d))); det.appendChild(inner); box.appendChild(det);
+}
+addRows($('colourCtl'), COLOUR);
+addRows($('partyCtl'), PARTY);
+addRows($('feelDips'), FEEL_DIPS);
+addRows($('feelSing'), FEEL_SING);
+addRows($('powerBox'), POWER);
 FX_CARDS.forEach(c => {
   const card = document.createElement('div'); card.className = 'card';
   const head = document.createElement('div'); head.className = 'card-head';
@@ -763,7 +762,7 @@ FX_CARDS.forEach(c => {
   if (c.toggle) { const sw = document.createElement('label'); sw.className = 'switch'; sw.title = c.title + ' on/off'; sw.innerHTML = `<input type="checkbox" aria-label="${c.title} on or off"><span></span>`; const cb = sw.querySelector('input'); cb.addEventListener('change', () => { vals[c.toggle] = cb.checked ? 1 : 0; send(`set ${c.toggle} ${vals[c.toggle]}`); renderAll(); }); toggles.push({ key: c.toggle, cb }); head.appendChild(sw); }
   card.appendChild(head);
   const rowsEl = document.createElement('div'); rowsEl.className = 'rows';
-  c.items.forEach(d => rowsEl.appendChild(slider(d)));
+  addRows(rowsEl, c.items);
   card.appendChild(rowsEl);
   if (c.col) card.appendChild(colourRow(c.col, c.autoDesc));
   $('fxCards').appendChild(card);
@@ -790,14 +789,13 @@ const FX_OFF = Object.fromEntries(ALL_FX.map(k => [k, 0]));
 const IDEAS = [
   ['Pearl shimmer', 'The Pearl look exactly, plus a gentle shimmer: each turn breathes a little with its own sound, and tiny pale glints sparkle on the hi-hats. Calm and glowing, no big moves.', { ...LOOKS['Pearl'], ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, bright: 120, dipdepth: 0.25, gdrive: 2, bandmin: 0.6, hatgain: 1.5, hats: 1, col_hat: 2, hue_hat: 224, sat_hat: 40 }],
   ['Pearl party', 'Pearl shimmer made party-ready: the base thumps with the bass and the face sparkles with the hats, pale pink ripple and spin at the drops, teal claps, more glints, colours moving faster. Calm parts stay pearly.', { ...LOOKS['Pearl'], ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, fx_claps: 1, fx_ripple: 1, fx_sling: 1, fx_spin: 1, bright: 170, gdrive: 2, bandmin: 0.3, gspin: 12, gheat: 0.3, hatgain: 2.5, hats: 2, col_hat: 2, hue_hat: 224, sat_hat: 40, clapgain: 1.5, col_clap: 2, hue_clap: 112, sat_clap: 150, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 224, sat_ripple: 80, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 224, sat_spin: 120 }],
-  ['Pearl pulse', 'The soft Pearl colours (blue, pink, amber, teal) with Ben\'s tuned pulse: each bass note fills the ball up to a pink face, colours slowly travel above a steady blue base, pink ripple and spin, teal claps, a quiet singer. Tuned for fast bounce.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_singer: 1, fx_claps: 1, fx_spin: 1, fx_ripple: 1, grad: 1, gradsrc: 1, gh0: 160, gh1: 32, gh2: 112, gh3: 224, gs0: 170, gs1: 170, gs2: 170, gs3: 170, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 40, gheat: 0.5, gbal: 0, bassh: 1, pump: 1, volfill: 0, gbuild: 1, zones: 1, zscale: 1, zc0: 0.28, zc1: 0.56, zc2: 0.05, zc3: 0.28, dipdepth: 0.7, diprelease: 90, depthslow: 0, eyesing: 25, clapgain: 1, clapdb: 3, col_clap: 2, hue_clap: 112, sat_clap: 170, spinbeats: 2, spinturns: 1, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 220, sat_spin: 121, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 224, sat_ripple: 81 }],
+  ['Pearl lounge', 'A slow mother-of-pearl shimmer for chilling.', { ...LOOKS['Pearl'], ...FX_OFF, fx_dips: 1, fx_sing: 1, dipdepth: 0.25, bright: 120 }],
   ['Bounce meter', 'Each bass note throws the light up to the face, like a level meter. The face is the opposite colour, so you see when the light reaches it.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Contrast'], bassh: 1, pump: 1, volfill: 1, dipdepth: 0.6, bright: 150 }],
   ['Knockdown', 'Each kick knocks a red face down into a blue base.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, ...LOOKS['Blue + red face'], bassh: 1, pump: 0, dipdepth: 0.7, bright: 110 }],
   ['Spotlight dancer', 'A dim warm ball where a white dancer and the sparks do the work. Best in a dark room.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, zones: 1, zc0: 0.1, zc1: 0.06, zc2: 0.06, zc3: 0.06, fx_dancer: 1, fx_flood: 1, fx_claps: 1, fx_hats: 1, cap: 30, col_eye: 2, hue_eye: 0, sat_eye: 0, bright: 140 }, 'Ember'],
-  ['Equaliser', 'Toxic acid look: bass thumps the base, hats twinkle at the face, quiet turns go dark. Aqua claps and ripple, a lime spin, all kept under the bands.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_claps: 1, fx_ripple: 1, fx_sling: 1, fx_spin: 1, bright: 150, grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, bandmin: 0, zones: 1, gbal: 1, clapgain: 1.5, col_clap: 2, hue_clap: 128, sat_clap: 200, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 128, sat_ripple: 180, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 72, sat_spin: 200 }],
-  ['Pearl lounge', 'A slow mother-of-pearl shimmer for chilling.', { ...LOOKS['Pearl'], ...FX_OFF, fx_dips: 1, fx_sing: 1, dipdepth: 0.25, bright: 120 }],
-  ['Build rocket', 'Build-ups climb from the base and burst at the drop. Contrast colours, so the climb to the face shows.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_roll: 1, fx_sling: 1, fx_ripple: 1, ...LOOKS['Contrast'], gbuild: 1, fx_roll: 1, sling: 0.6, bright: 150 }],
-  ['Garage drift', 'Slow colour movement for long drones and sustained bass.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.3 }],
+  ['Equaliser', 'Toxic acid look: bass thumps the base, hats twinkle at the face, quiet turns go dark. Lime claps, a yellow ripple and a lime spin, all kept under the bands.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_claps: 1, fx_ripple: 1, fx_sling: 1, fx_spin: 1, bright: 150, grad: 1, gradsrc: 1, gh0: 0, gh1: 32, gh2: 96, gh3: 128, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gdrive: 2, bandmin: 0, zones: 1, gbal: 1, clapgain: 1.5, col_clap: 2, hue_clap: 72, sat_clap: 180, ripplegain: 1.5, sling: 0.3, col_ripple: 2, hue_ripple: 56, sat_ripple: 150, spingain: 1.5, spindim: 0, col_spin: 2, hue_spin: 72, sat_spin: 200 }],
+  ['Moving contrast', 'A gradient that steps from the glow colour to its opposite at the face, moving with the music. (Was Build rocket: the climb in build-ups did not read.)', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_roll: 1, fx_sling: 1, fx_ripple: 1, ...LOOKS['Contrast'], gbuild: 1, fx_roll: 1, sling: 0.6, bright: 150 }],
+  ['Garage drift', 'Slow travelling colours for long drones and build-ups, then the drop lands: a pink ripple and a warm slingshot, teal claps on the backbeat, a stronger pump, and a violet spin as it ends.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_hats: 1, fx_claps: 1, fx_ripple: 1, fx_sling: 1, fx_spin: 1, grad: 1, gradsrc: 1, gh0: 192, gh1: 160, gh2: 120, gh3: 224, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gspin: 40, gheat: 0.5, gbal: 1, volfill: 1, pump: 1, dipdepth: 0.45, sling: 0.4, ripplegain: 2, col_ripple: 2, hue_ripple: 224, sat_ripple: 120, clapgain: 1.5, col_clap: 2, hue_clap: 120, sat_clap: 180, spingain: 2, spindim: 0.3, col_spin: 2, hue_spin: 200, sat_spin: 160 }],
   ['Contrast face', 'The face always in the opposite colour to the body.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_singer: 1, ...LOOKS['Contrast'], fx_singer: 1 }],
   ['Rave', 'Big colour jumps and hard pulses.', { ...FX_OFF, fx_sing: 1, fx_dips: 1, fx_party: 1, fx_sparkles: 1, fx_ripple: 1, partyrange: 9, pump: 1, dipdepth: 0.85, zones: 0 }, 'Neon'],
   ['Candle (lamp)', 'A warm two-tone light with slow breathing. No music needed.', { mode: 1, lampgrad: 1, lamphue: 20, lampsat: 255, lamphue2: 0, lampsat2: 255, lampbreathe: 1, lampbright: 90 }],
@@ -1533,7 +1531,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.85, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
-  relbeats: 0.3, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
+  relbeats: 0.3, levelrise: 8000, nodlead: 1, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
   gdrive: 0, revrange: 12, revmin: 0.25, revrel: 250, bandmin: 0.2, gbuild: 1, lampgrad: 0, lamphue2: 200, lampsat2: 200,
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,

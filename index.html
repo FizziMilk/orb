@@ -678,6 +678,7 @@ function toggle(key, label, desc, trig) {
 const controls = [], toggles = [];
 function renderAll() {
   controls.forEach(c => c.render());
+  if (window.cfxReady) cfxRender();
   toggles.forEach(t => t.cb.checked = vals[t.key] == 1);
   document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === +(vals.mode ?? 0))));
   $('lampCtl').hidden = vals.mode != 1;
@@ -792,7 +793,7 @@ FX_CARDS.forEach(c => {
 // ---------------- Custom effects (effects studio) ----------------
 // The design (LEDs, movement, trigger, sections, length, fade, blend) is shared by every preset and kept on the orb
 // ('fxd' + 'fxsave'); on/off, colour, brightness and speed are normal preset settings (cfKon, col_cfK, cfKgain, ...).
-const CFX_MAX = 16;
+const CFX_MAX = 32;
 const CFX_TRIG = [
   ['Kick', 1], ['Clap', 2], ['Hi-hat', 3], ['Snare', 4], ['Lead note', 5],
   ['Every beat', 6], ['Every bar (4 beats)', 7], ['Every phrase (16 beats)', 8],
@@ -946,7 +947,7 @@ $('fxCards').appendChild(cfxHeadCard);
 for (let k = 0; k < CFX_MAX; k++) {
   const card = document.createElement('div'); card.className = 'card'; card.hidden = true;
   const head = document.createElement('div'); head.className = 'card-head';
-  head.innerHTML = `<div class="grow"><h2>Custom effect ${k + 1}</h2><p class="muted small" data-sum></p></div><button class="small" data-try>Try</button>`;
+  head.innerHTML = `<div class="grow"><h2>Custom effect ${k + 1}</h2><p class="muted small" data-sum></p><p class="small" data-used></p></div><button class="small" data-try>Try</button>`;
   const sw = document.createElement('label'); sw.className = 'switch'; sw.innerHTML = `<input type="checkbox" aria-label="Custom effect on or off in this preset"><span></span>`;
   const cb = sw.querySelector('input'); const onKey = 'cf' + k + 'on';
   cb.addEventListener('change', () => { vals[onKey] = cb.checked ? 1 : 0; send(`set ${onKey} ${vals[onKey]}`); renderAll(); });
@@ -967,15 +968,26 @@ for (let k = 0; k < CFX_MAX; k++) {
   acts.querySelector('[data-delbox]').addEventListener('click', (e) => {
     const box = acts.querySelector('[data-delbox]');
     if (e.target.matches('[data-del]')) box.innerHTML = `<span class="small">Removes it from the orb and every preset.</span><button class="small" data-yes style="border-color:var(--bad);color:var(--bad)">Delete for good</button><button class="small ghost" data-no>Keep</button>`;
-    else if (e.target.matches('[data-yes]')) { if (cfxEditing === k) cfxClose(false); send('fxdel ' + k); fxLib[k] = null; Object.assign(vals, cfxDefaults(k)); toast('Deleted from every preset'); cfxRender(); box.innerHTML = '<button class="small ghost" data-del>Delete</button>'; }
+    else if (e.target.matches('[data-yes]')) { if (cfxEditing === k) cfxClose(false); send('fxdel ' + k); fxLib[k] = null; slots.forEach(sl => { if (sl && sl.fx !== null) sl.fx &= ~(1 << k); }); Object.assign(vals, cfxDefaults(k)); toast('Deleted from every preset'); cfxRender(); box.innerHTML = '<button class="small ghost" data-del>Delete</button>'; }
     else if (e.target.matches('[data-no]')) box.innerHTML = '<button class="small ghost" data-del>Delete</button>';
   });
   $('fxCards').appendChild(card);
-  cfxCards.push({ card, h2: head.querySelector('h2'), sum: head.querySelector('[data-sum]'), slot, editBtn: acts.querySelector('[data-edit]') });
+  cfxCards.push({ card, h2: head.querySelector('h2'), sum: head.querySelector('[data-sum]'), used: head.querySelector('[data-used]'), slot, editBtn: acts.querySelector('[data-edit]') });
 }
 const trigName = t => (CFX_TRIG.find(x => x[1] === t) || ['?'])[0];
 const moveName = m => (CFX_MOVE.find(x => x[1] === m) || ['?'])[0];
 const lenText = d => d.unit ? (d.len / 10).toFixed(1) + ' s' : (d.len / 4) + ' beat' + (d.len === 4 ? '' : 's');
+// Which presets have effect K on (the preset the orb is on counts with its live, maybe unsaved, switch)
+function cfxUsedText(k) {
+  const names = []; let unknown = false;
+  slots.forEach((sl, i) => {
+    const on = i === activeSlot ? vals['cf' + k + 'on'] == 1 : sl && sl.fx !== null ? ((sl.fx >>> k) & 1) === 1 : (sl ? (unknown = true, false) : false);
+    if (on) names.push(sl ? sl.name : 'this preset');
+  });
+  if (activeSlot < 0 && vals['cf' + k + 'on'] == 1) names.push('the current look');
+  if (unknown) return names.length ? 'Used in ' + names.join(', ') + ' (update the orb to see all presets).' : '';
+  return names.length ? 'Used in ' + names.join(', ') + '.' : 'Not used in any preset.';
+}
 function cfxRender() {
   let any = false;
   cfxCards.forEach((c, k) => {
@@ -984,6 +996,7 @@ function cfxRender() {
     const secs = d.secs ? CFX_SECS.filter(([, b]) => (d.secs >> b) & 1).map(([n]) => n.toLowerCase()).join(', ') : '';
     c.sum.textContent = `${moveName(d.move)}, ${trigName(d.trig).toLowerCase()}${d.every > 1 && d.trig !== 13 && d.trig !== 0 ? ' (every ' + d.every + ')' : ''}${secs ? ', in ' + secs : ''}, ${lenText(d)}.`;
     c.editBtn.textContent = cfxEditing === k ? 'Close designer' : 'Edit design';
+    c.used.textContent = cfxUsedText(k);
   });
   $('cfxNone').hidden = any;
   $('cfxNew').disabled = fxLib.every(Boolean);
@@ -992,6 +1005,7 @@ function cfxRender() {
 // The designer: one panel, opened inside the card being edited. Changes show on the orb straight away;
 // Save design keeps them (for every preset), Cancel puts the old design back
 let cfxEditing = -1, cfxDraft = null, cfxOrig = null, cfxAnim = 0;
+window.cfxReady = true;
 const des = document.createElement('div'); des.className = 'rows designer';
 des.innerHTML = `
   <div class="ctl"><label for="cfxName">Name</label><output></output><input type="text" id="cfxName" maxlength="19" style="grid-column:1/-1"></div>
@@ -1745,9 +1759,10 @@ function onLine(line) {
         const [md, lh, ls] = f[5].trim().split(/\s+/).map(Number), pw = f[6].trim().split(/\s+/).map(Number), pl = [];
         for (let i = 0; i < pw[0]; i++) pl.push([pw[1 + 3 * i], pw[2 + 3 * i], pw[3 + 3 * i]]);
         const gw = (f[8] || '').trim().split(/\s+/).map(Number);            // grad src h0..h3 s0..s3 (newer sketches)
-        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl, orig: f[7] === '1', gr: gw.length >= 10 ? { on: gw[0] === 1, src: gw[1], h: gw.slice(2, 6), s: gw.slice(6, 10) } : null };
+        slots[k] = { name: f[3], desc: f[4], mode: md, lh, ls, pal: pl, orig: f[7] === '1', gr: gw.length >= 10 ? { on: gw[0] === 1, src: gw[1], h: gw.slice(2, 6), s: gw.slice(6, 10) } : null,
+          fx: f[9] !== undefined && f[9] !== '' ? parseInt(f[9], 16) >>> 0 : null };   // custom effects on (bit K), newer sketches
       } else slots[k] = null;
-      slotSeen.add(k); renderPresets(); updateSaveBtn(); maybeInstall();
+      slotSeen.add(k); renderPresets(); updateSaveBtn(); maybeInstall(); if (window.cfxReady) cfxRender();
     }
     return;
   }
@@ -1946,7 +1961,7 @@ function startDemo() {
     else if (w[0] === 'pal') { const n = +w[1]; demoPal = []; for (let i = 0; i < n; i++) demoPal.push([+w[2 + 3 * i], +w[3 + 3 * i], +w[4 + 3 * i]]); }
     else if (w[0] === 'pinfo') { for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`); reply('cur -1'); }
     else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
-      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}|${['grad', 'gradsrc', 'gh0', 'gh1', 'gh2', 'gh3', 'gs0', 'gs1', 'gs2', 'gs3'].map(k => Math.round(st[k] ?? 0)).join(' ')}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}|${['grad', 'gradsrc', 'gh0', 'gh1', 'gh2', 'gh3', 'gs0', 'gs1', 'gs2', 'gs3'].map(k => Math.round(st[k] ?? 0)).join(' ')}|${Array.from({ length: CFX_MAX }, (_, j) => st['cf' + j + 'on'] == 1 ? 2 ** j : 0).reduce((x, y) => x + y, 0).toString(16)}`; reply('ok psave ' + k); reply(demoSlots[k]); }
     else if (w[0] === 'pname') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|'); if (demoSlots[k]) { const f = demoSlots[k].split('|'); f[3] = nd[0]; f[4] = nd[1] || ''; f[7] = '0'; demoSlots[k] = f.join('|'); reply('ok pname ' + k); reply(demoSlots[k]); } }
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }

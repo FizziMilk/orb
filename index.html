@@ -842,11 +842,8 @@ function ledSpots() {
   for (let i = 0; i < ledCount; i++) {
     let r = 0; for (let k = 1; k < n; k++) if (Math.abs(i - R[k]) < Math.abs(i - R[r])) r = k;
     const dx = i - R[r], u = dx / (dx >= 0 ? lenAfter(r) : lenBefore(r));   // turns from this ring's front (+ = round to the right)
-    let s = 0;                                                    // the step to the next ring, over the back third
-    if (u > 0.33 && r < n - 1) s = Math.min(0.5, (u - 0.33) / 0.34 * 0.5);
-    if (u < -0.33 && r > 0) s = -Math.min(0.5, (-0.33 - u) / 0.34 * 0.5);
-    let x = ((u + 0.5) % 1 + 1) % 1 - 0.5; if (rows.dir < 0) x = -x;
-    out.push({ x, y: r + s, turn: r });
+    const x = rows.dir < 0 ? -u : u;                              // one straight row per turn, fronts lined up
+    out.push({ x, y: r, turn: r });
   }
   return out;
 }
@@ -902,6 +899,8 @@ function makeMap(onTap) {
     const key = [ledCount, rows.n, rows.dir, ...rows.r.slice(0, rows.n)].join(',');
     if (key === m.key) return; m.key = key;                       // (only when the calibration changed)
     g.innerHTML = ''; m.dots = []; m.spots = ledSpots(); m.xy = [];
+    const xs = m.spots.map(p => p.x * MAP_W), lo = Math.min(-2.3, ...xs.map(x => x - 0.2)), hi = Math.max(2.3, ...xs.map(x => x + 0.2));
+    svg.setAttribute('viewBox', `${lo.toFixed(2)} 0 ${(hi - lo).toFixed(2)} ${H.toFixed(2)}`);
     m.spots.forEach((s, i) => {
       const cx = s.x * MAP_W, cy = 0.3 + (3.5 - s.y) * MAP_ROW;
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -996,7 +995,7 @@ let cfxEditing = -1, cfxDraft = null, cfxOrig = null, cfxAnim = 0;
 const des = document.createElement('div'); des.className = 'rows designer';
 des.innerHTML = `
   <div class="ctl"><label for="cfxName">Name</label><output></output><input type="text" id="cfxName" maxlength="19" style="grid-column:1/-1"></div>
-  <div><h3>Where</h3><p class="muted small">Tap LEDs to pick them, or drag across. The map is the LED cup opened out flat: four rings, front in the middle, back at both edges (where the strip steps up to the next ring). It plays the effect while you edit.</p></div>
+  <div><h3>Where</h3><p class="muted small">Tap LEDs to pick them, or drag across. The map is the LED cup opened out flat: one row per turn, bottom turn at the bottom, front in the middle, back at both edges. It plays the effect while you edit.</p></div>
   <div data-map></div>
   <div class="btns" data-picks></div>
   <div class="ctl"><label for="cfxTrig">When</label><output></output><select id="cfxTrig" style="grid-column:1/-1"></select></div>

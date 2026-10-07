@@ -183,6 +183,16 @@ select { width: auto; }
 @media (pointer: coarse) { input[type=range] { pointer-events: none; } .ctl { touch-action: pan-y; } }
 .confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Custom effects: the orb map (the cup opened out flat) */
+.orbmap { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px; max-width: 560px; }
+.orbmap svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; }
+.orbmap circle { fill: transparent; stroke: var(--muted); stroke-width: 0.025; cursor: pointer; }
+.orbmap circle.on { stroke: var(--fg); stroke-width: 0.045; fill: color-mix(in srgb, var(--fg) 12%, transparent); }
+.orbmap .frontline { stroke: var(--line); stroke-width: 0.03; stroke-dasharray: 0.08 0.08; }
+.orbmap .maplabel { fill: var(--muted); font: 0.2px var(--body); }
+.designer { border-top: 1px solid var(--line); padding-top: 12px; }
+.designer select, .designer input[type=text] { font: 500 0.9rem var(--body); color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.btns button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 
@@ -378,6 +388,8 @@ select { width: auto; }
         <label class="small"><input type="color" data-tcol="1" value="#006eff"> selected</label>
         <label class="small"><input type="color" data-tcol="2" value="#00aa28"> eye</label>
         <label class="small"><input type="color" data-tcol="3" value="#000000"> background</label></div>
+      <p class="muted small">Or tap the front LED of each turn on the map (the LED cup opened out flat; the dashed line is the front). Fine-tune with ◀ ▶ below.</p>
+      <div id="rowsMap"></div>
       <div class="rows" id="rowsEd"></div>
       <div class="numrow">
         <button id="rowAdd" class="small">Add turn</button><button id="rowDel" class="small ghost">Remove top turn</button>
@@ -406,7 +418,7 @@ select { width: auto; }
       <h2>Serial log</h2>
       <div class="numrow">
         <select id="logMode" aria-label="Serial log mode">
-          <option value="7">Features (7)</option><option value="4">Full log (4)</option><option value="5">Kick events (5)</option>
+          <option value="8">Everything (8)</option><option value="7">Features (7)</option><option value="4">Full log (4)</option><option value="5">Kick events (5)</option>
           <option value="1">Tempo (1)</option><option value="2">Mood (2)</option><option value="3">Power (3)</option><option value="6">Quiet (6)</option><option value="0">Plotter (0)</option>
         </select>
         <button id="logSet" class="small">Set</button>
@@ -777,6 +789,342 @@ FX_CARDS.forEach(c => {
   if (c.col) card.appendChild(colourRow(c.col, c.autoDesc));
   $('fxCards').appendChild(card);
 });
+// ---------------- Custom effects (effects studio) ----------------
+// The design (LEDs, movement, trigger, sections, length, fade, blend) is shared by every preset and kept on the orb
+// ('fxd' + 'fxsave'); on/off, colour, brightness and speed are normal preset settings (cfKon, col_cfK, cfKgain, ...).
+const CFX_MAX = 16;
+const CFX_TRIG = [
+  ['Kick', 1], ['Clap', 2], ['Hi-hat', 3], ['Snare', 4], ['Lead note', 5],
+  ['Every beat', 6], ['Every bar (4 beats)', 7], ['Every phrase (16 beats)', 8],
+  ['Drop starts', 9], ['Build-up starts', 10], ['Groove starts', 11], ['Calm part starts', 12],
+  ['Always on', 13], ['Only with Try', 0]];
+const CFX_MOVE = [
+  ['Still', 0, null], ['Spin round', 1, 'Width (LEDs)'], ['Rise (band)', 2, 'Band height (tenths of a turn)'], ['Fall (band)', 3, 'Band height (tenths of a turn)'],
+  ['Spread from the front', 4, 'Ring width (LEDs)'], ['Chase along the strip', 5, 'Tail length (LEDs)'], ['Twinkle', 6, 'How busy'],
+  ['Flash on/off', 7, null], ['Breathe', 8, null], ['Falling dots (snow)', 9, 'Dots'], ['Rising dots', 10, 'Dots']];
+const CFX_SECS = [['Calm', 1], ['Build-up', 2], ['Groove', 3], ['Drop', 4]];
+const CFX_BLEND = [['Over', 0, 'Covers the glow with the effect colour.'], ['Add', 1, 'Adds light on top: brighter, colours mix.'], ['Darken', 2, 'Cuts dark shapes out of the glow (colour and brightness unused).']];
+const cfxKeys = k => ['cf' + k + 'on', 'col_cf' + k, 'hue_cf' + k, 'sat_cf' + k, 'shift_cf' + k, 'cf' + k + 'gain', 'cf' + k + 'speed'];
+function cfxDefaults(k) { const [on, col, hu, sa, sh, ga, sp] = cfxKeys(k); return { [on]: 0, [col]: 0, [hu]: 0, [sa]: 255, [sh]: 36, [ga]: 4, [sp]: 1 }; }
+let fxLib = Array(CFX_MAX).fill(null);         // designs from the orb: { trig, secs, move, size, reps, every, fade, len, unit, blend, mask: [59 bools], name }
+const maskHex = m => { let s = ''; for (let b = 0; b < 8; b++) { let v = 0; for (let i = 0; i < 8; i++) if (m[b * 8 + i]) v |= 1 << i; s += v.toString(16).padStart(2, '0'); } return s; };
+const hexMask = h => { const m = []; for (let i = 0; i < 64; i++) m.push(((parseInt(h.substr(2 * (i >> 3), 2), 16) >> (i & 7)) & 1) === 1); return m.slice(0, 59); };
+const cleanName = n => String(n || '').replace(/[;:=|\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 19) || 'Effect';
+const FXF = ['trig', 'secs', 'move', 'size', 'reps', 'every', 'fade', 'len', 'unit', 'blend'];
+function fxdLine(k, d) { return `fxd ${k} ${FXF.map(f => Math.round(d[f])).join(' ')} ${maskHex(d.mask)} ${cleanName(d.name)}`; }
+function parseFxd(w, line) {                    // fxd K - | fxd K trig secs move size reps every fade len unit blend MASK NAME
+  const k = +w[1]; if (!(k >= 0 && k < CFX_MAX)) return;
+  if (w[2] === '-' || w.length < 13) fxLib[k] = null;
+  else {
+    const d = {}; FXF.forEach((f, i) => d[f] = +w[2 + i]);
+    d.mask = hexMask(w[12]); d.name = w.slice(13).join(' ') || 'Effect ' + (k + 1);
+    fxLib[k] = d;
+  }
+  cfxRender();
+}
+const sameDesign = (a, b) => a && b && FXF.every(f => +a[f] === +b[f]) && maskHex(a.mask) === maskHex(b.mask);
+// Look codes: fxK=trig:secs:move:size:reps:every:fade:len:unit:blend:MASK:name (the designs of the effects the look uses)
+const fxCode = d => [...FXF.map(f => Math.round(d[f])), maskHex(d.mask), cleanName(d.name)].join(':');
+function fxFromCode(v) {
+  const p = v.split(':'); if (p.length < 12 || !/^[0-9a-f]{16}$/i.test(p[10])) return null;
+  const d = {}; FXF.forEach((f, i) => d[f] = +p[i]); if (FXF.some(f => isNaN(d[f]))) return null;
+  d.mask = hexMask(p[10].toLowerCase()); d.name = cleanName(p.slice(11).join(' ')); return d;
+}
+
+// The orb map: each LED's spot on the cup laid out flat (x: -0.5..0.5 round the cup, front in the middle, back at
+// both edges; y: turns, 0 = bottom). From Ben's photos (7 Oct): the strip runs in four level rings round the cup
+// (13.5 cm tall, 8 cm wide at the bottom, 7 cm at the top, rings ~2.4 cm apart) and steps up to the next ring
+// across the back. Each turn's length comes from the front-line calibration (15.5 / 15 / 14 LEDs)
+function ledSpots() {
+  const n = rows.n, R = rows.r, out = [];
+  const lenAfter = r => r < n - 1 ? R[r + 1] - R[r] : (n > 1 ? R[n - 1] - R[n - 2] : ledCount / 4);
+  const lenBefore = r => r > 0 ? R[r] - R[r - 1] : lenAfter(0);
+  for (let i = 0; i < ledCount; i++) {
+    let r = 0; for (let k = 1; k < n; k++) if (Math.abs(i - R[k]) < Math.abs(i - R[r])) r = k;
+    const dx = i - R[r], u = dx / (dx >= 0 ? lenAfter(r) : lenBefore(r));   // turns from this ring's front (+ = round to the right)
+    let s = 0;                                                    // the step to the next ring, over the back third
+    if (u > 0.33 && r < n - 1) s = Math.min(0.5, (u - 0.33) / 0.34 * 0.5);
+    if (u < -0.33 && r > 0) s = -Math.min(0.5, (-0.33 - u) / 0.34 * 0.5);
+    let x = ((u + 0.5) % 1 + 1) % 1 - 0.5; if (rows.dir < 0) x = -x;
+    out.push({ x, y: r + s, turn: r });
+  }
+  return out;
+}
+
+// Preview: the same movement maths as the orb, for the map
+function fxWeights(d, p, spots, st) {
+  const n = ledCount, tl = n / 4, w = new Array(n).fill(0), sz = Math.max(1, d.size), q = (p * Math.max(1, d.reps)) % 1;
+  const sel = []; for (let i = 0; i < n; i++) if (d.mask[i]) sel.push(i);
+  const rank = new Array(n).fill(-1); sel.forEach((i, r) => rank[i] = r);
+  for (const i of sel) {
+    const h = i / tl, a = h % 1;
+    switch (d.move) {
+      case 0: w[i] = 1; break;
+      case 1: { const dl = Math.abs(((a - q + 10.5) % 1) - 0.5) * tl; w[i] = Math.max(0, 1 - dl / sz); break; }
+      case 2: case 3: { const sw = sz / 10; let H = -sw + q * (4 + 2 * sw); if (d.move === 3) H = 4 - H; w[i] = Math.max(0, 1 - Math.abs(h - H) / sw); break; }
+      case 4: { const dx = Math.abs(spots[i].x) * tl, R = -sz + q * (tl * 0.5 + 2 * sz); w[i] = Math.max(0, 1 - Math.abs(dx - R) / sz); break; }
+      case 5: { const pos = q * (sel.length + sz), dd = pos - rank[i]; w[i] = dd >= 0 ? Math.max(0, 1 - dd / sz) : 0; break; }
+      case 6: { st.tw = st.tw || new Array(n).fill(0); if (Math.random() < sz / 100) st.tw[i] = 1; else st.tw[i] *= 0.82; w[i] = st.tw[i]; break; }
+      case 7: w[i] = q < 0.5 ? 1 : 0; break;
+      case 8: w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * q); break;
+    }
+  }
+  if (d.move === 9 || d.move === 10) {                    // dots: a few cross the orb per run
+    st.dots = st.dots || []; const up = d.move === 10, dt = 1 / 60, speed = 4 / Math.max(0.05, st.dur / 1000);
+    if (st.dots.length < Math.min(sz, 12) && Math.random() < sz / 100 * 3) st.dots.push({ x: Math.random() * tl, y: up ? 0 : 3 + Math.random(), ph: Math.random() * 6 });
+    st.dots = st.dots.filter(o => { o.y += (up ? 1.3 : -1) * speed * dt; o.ph += dt * 2; return up ? o.y < 4 : o.y > 0; });
+    for (const o of st.dots) {
+      const left = up ? (4 - o.y) / 4 : o.y / 4, al = Math.min(1, left * 4), x = o.x + 0.6 * Math.sin(o.ph), lo = Math.floor(o.y), fy = o.y - lo;
+      for (let r = 0; r < 2; r++) {
+        const pd = (lo + r) * tl + ((x + tl) % tl), wy = r ? fy : 1 - fy; if (pd < 0 || pd > n - 1.001) continue;
+        const i0 = Math.floor(pd), fx = pd - i0;
+        if (rank[i0] >= 0) w[i0] = Math.max(w[i0], al * wy * (1 - fx));
+        if (rank[i0 + 1] >= 0) w[i0 + 1] = Math.max(w[i0 + 1], al * wy * fx);
+      }
+    }
+  }
+  return w;
+}
+
+// The map element. Effects: tap or drag across LEDs to pick them; it plays the effect while the designer is open.
+// Setup: onTap(i) instead of painting. Touches pick the nearest LED, so the small dots are easy to hit
+const MAP_W = 4, MAP_ROW = 0.6;                              // map units: the cup's way round, and between rings (~2.4 cm)
+function makeMap(onTap) {
+  const box = document.createElement('div'); box.className = 'orbmap';
+  const H = 0.45 + 3.5 * MAP_ROW + 0.55;
+  box.innerHTML = `<svg viewBox="-2.3 0 4.6 ${H.toFixed(2)}" role="group" aria-label="Orb map">
+    <line x1="0" y1="0.1" x2="0" y2="${(H - 0.4).toFixed(2)}" class="frontline"/><text x="0" y="${(H - 0.12).toFixed(2)}" class="maplabel" text-anchor="middle">front</text>
+    <text x="-2.25" y="${(H - 0.12).toFixed(2)}" class="maplabel" text-anchor="start">back</text><text x="2.25" y="${(H - 0.12).toFixed(2)}" class="maplabel" text-anchor="end">back</text>
+    <text x="-1" y="${(H - 0.12).toFixed(2)}" class="maplabel" text-anchor="middle">left</text><text x="1" y="${(H - 0.12).toFixed(2)}" class="maplabel" text-anchor="middle">right</text><g></g></svg>`;
+  const svg = box.querySelector('svg'), g = svg.querySelector('g');
+  const m = { box, dots: [], design: null, onChange: null, spots: [], xy: [] };
+  m.build = () => {
+    const key = [ledCount, rows.n, rows.dir, ...rows.r.slice(0, rows.n)].join(',');
+    if (key === m.key) return; m.key = key;                       // (only when the calibration changed)
+    g.innerHTML = ''; m.dots = []; m.spots = ledSpots(); m.xy = [];
+    m.spots.forEach((s, i) => {
+      const cx = s.x * MAP_W, cy = 0.3 + (3.5 - s.y) * MAP_ROW;
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', cx.toFixed(3)); c.setAttribute('cy', cy.toFixed(3)); c.setAttribute('r', 0.1);
+      c.innerHTML = `<title>LED ${i}</title>`; g.appendChild(c); m.dots.push(c); m.xy.push([cx, cy]);
+    });
+  };
+  const nearest = (e) => {
+    const ctm = svg.getScreenCTM(); if (!ctm) return -1;
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    let best = -1, bd = 0.2 * 0.2;
+    m.xy.forEach(([x, y], i) => { const d = (x - pt.x) ** 2 + (y - pt.y) ** 2; if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  let paint = null;
+  svg.addEventListener('pointerdown', (e) => {
+    const i = nearest(e); if (i < 0) return;
+    if (onTap) { onTap(i); e.preventDefault(); return; }
+    if (!m.design) return;
+    paint = !m.design.mask[i]; m.design.mask[i] = paint; m.draw(); e.preventDefault();
+    try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  svg.addEventListener('pointermove', (e) => { if (paint === null) return; const i = nearest(e); if (i >= 0 && m.design.mask[i] !== paint) { m.design.mask[i] = paint; m.draw(); } });
+  const up = () => { if (paint !== null) { paint = null; m.onChange && m.onChange(); } };
+  svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  m.draw = (w, col) => m.dots.forEach((c, i) => {
+    const on = m.design && m.design.mask[i], lv = w ? w[i] : 0;
+    c.classList.toggle('on', !!on);
+    c.style.fill = lv > 0.02 ? col : '';
+    c.style.fillOpacity = lv > 0.02 ? Math.min(1, 0.15 + lv) : '';
+  });
+  m.mark = (colOf) => m.dots.forEach((c, i) => { const col = colOf(i); c.classList.toggle('on', !!col); c.style.fill = col || ''; c.style.fillOpacity = col ? 1 : ''; });
+  m.build();
+  return m;
+}
+
+// One card per slot (hidden while empty), built once so their sliders register like every other control
+const cfxCards = [];
+const cfxHeadCard = document.createElement('div'); cfxHeadCard.className = 'card';
+cfxHeadCard.innerHTML = `<div class="card-head"><div class="grow"><h2>Custom effects</h2><p class="muted small">Effects you design yourself. The design is shared by every preset; on/off, colour, brightness and speed are kept per preset, like the effects above.</p></div><button class="small primary" id="cfxNew">New effect</button></div>
+  <p class="muted small" id="cfxNone">None yet. New effect starts one you can shape.</p>`;
+$('fxCards').appendChild(cfxHeadCard);
+for (let k = 0; k < CFX_MAX; k++) {
+  const card = document.createElement('div'); card.className = 'card'; card.hidden = true;
+  const head = document.createElement('div'); head.className = 'card-head';
+  head.innerHTML = `<div class="grow"><h2>Custom effect ${k + 1}</h2><p class="muted small" data-sum></p></div><button class="small" data-try>Try</button>`;
+  const sw = document.createElement('label'); sw.className = 'switch'; sw.innerHTML = `<input type="checkbox" aria-label="Custom effect on or off in this preset"><span></span>`;
+  const cb = sw.querySelector('input'); const onKey = 'cf' + k + 'on';
+  cb.addEventListener('change', () => { vals[onKey] = cb.checked ? 1 : 0; send(`set ${onKey} ${vals[onKey]}`); renderAll(); });
+  toggles.push({ key: onKey, cb }); head.appendChild(sw);
+  card.appendChild(head);
+  const rowsEl = document.createElement('div'); rowsEl.className = 'rows';
+  addRows(rowsEl, [S('cf' + k + 'gain', 'Brightness', 0.5, 12, 0.5, { fmt: v => '×' + v }),
+                   S('cf' + k + 'speed', 'Speed', 0.25, 4, 0.05, { fmt: v => '×' + (+v).toFixed(2), hint: 'This preset only: faster or slower than the design (shorter or longer runs).' })]);
+  card.appendChild(rowsEl);
+  card.appendChild(colourRow('cf' + k, 'a brighter glow colour'));
+  const acts = document.createElement('div'); acts.className = 'btns';
+  acts.innerHTML = `<button class="small" data-edit>Edit design</button><button class="small" data-dup>Duplicate</button><span class="confirm" data-delbox><button class="small ghost" data-del>Delete</button></span>`;
+  card.appendChild(acts);
+  const slot = document.createElement('div'); card.appendChild(slot);
+  head.querySelector('[data-try]').addEventListener('click', () => { send('fxtest ' + k); toast('Fired: ' + (fxLib[k]?.name || 'effect')); });
+  acts.querySelector('[data-edit]').addEventListener('click', () => cfxEdit(k));
+  acts.querySelector('[data-dup]').addEventListener('click', () => cfxDuplicate(k));
+  acts.querySelector('[data-delbox]').addEventListener('click', (e) => {
+    const box = acts.querySelector('[data-delbox]');
+    if (e.target.matches('[data-del]')) box.innerHTML = `<span class="small">Removes it from the orb and every preset.</span><button class="small" data-yes style="border-color:var(--bad);color:var(--bad)">Delete for good</button><button class="small ghost" data-no>Keep</button>`;
+    else if (e.target.matches('[data-yes]')) { if (cfxEditing === k) cfxClose(false); send('fxdel ' + k); fxLib[k] = null; Object.assign(vals, cfxDefaults(k)); toast('Deleted from every preset'); cfxRender(); box.innerHTML = '<button class="small ghost" data-del>Delete</button>'; }
+    else if (e.target.matches('[data-no]')) box.innerHTML = '<button class="small ghost" data-del>Delete</button>';
+  });
+  $('fxCards').appendChild(card);
+  cfxCards.push({ card, h2: head.querySelector('h2'), sum: head.querySelector('[data-sum]'), slot, editBtn: acts.querySelector('[data-edit]') });
+}
+const trigName = t => (CFX_TRIG.find(x => x[1] === t) || ['?'])[0];
+const moveName = m => (CFX_MOVE.find(x => x[1] === m) || ['?'])[0];
+const lenText = d => d.unit ? (d.len / 10).toFixed(1) + ' s' : (d.len / 4) + ' beat' + (d.len === 4 ? '' : 's');
+function cfxRender() {
+  let any = false;
+  cfxCards.forEach((c, k) => {
+    const d = fxLib[k]; c.card.hidden = !d; if (!d) return; any = true;
+    c.h2.textContent = d.name;
+    const secs = d.secs ? CFX_SECS.filter(([, b]) => (d.secs >> b) & 1).map(([n]) => n.toLowerCase()).join(', ') : '';
+    c.sum.textContent = `${moveName(d.move)}, ${trigName(d.trig).toLowerCase()}${d.every > 1 && d.trig !== 13 && d.trig !== 0 ? ' (every ' + d.every + ')' : ''}${secs ? ', in ' + secs : ''}, ${lenText(d)}.`;
+    c.editBtn.textContent = cfxEditing === k ? 'Close designer' : 'Edit design';
+  });
+  $('cfxNone').hidden = any;
+  $('cfxNew').disabled = fxLib.every(Boolean);
+}
+
+// The designer: one panel, opened inside the card being edited. Changes show on the orb straight away;
+// Save design keeps them (for every preset), Cancel puts the old design back
+let cfxEditing = -1, cfxDraft = null, cfxOrig = null, cfxAnim = 0;
+const des = document.createElement('div'); des.className = 'rows designer';
+des.innerHTML = `
+  <div class="ctl"><label for="cfxName">Name</label><output></output><input type="text" id="cfxName" maxlength="19" style="grid-column:1/-1"></div>
+  <div><h3>Where</h3><p class="muted small">Tap LEDs to pick them, or drag across. The map is the LED cup opened out flat: four rings, front in the middle, back at both edges (where the strip steps up to the next ring). It plays the effect while you edit.</p></div>
+  <div data-map></div>
+  <div class="btns" data-picks></div>
+  <div class="ctl"><label for="cfxTrig">When</label><output></output><select id="cfxTrig" style="grid-column:1/-1"></select></div>
+  <div data-every></div>
+  <div><h3>Only in</h3><p class="muted small">None picked = any part of the song.</p></div><div class="btns" data-secs></div>
+  <div class="ctl"><label for="cfxMove">Movement</label><output></output><select id="cfxMove" style="grid-column:1/-1"></select></div>
+  <div data-size></div><div data-reps></div>
+  <div class="card-head"><div class="grow"><h3>Length</h3></div><div class="seg" data-unit><button data-v="0">Beats</button><button data-v="1">Seconds</button></div></div>
+  <div data-len></div><div data-fade></div>
+  <div class="card-head"><div class="grow"><h3>Mix</h3><p class="muted small" data-blenddesc></p></div><div class="seg" data-blend>${CFX_BLEND.map(([n, v]) => `<button data-v="${v}">${n}</button>`).join('')}</div></div>
+  <div class="btns"><button class="primary" data-save>Save design</button><button data-try2>Try</button><button class="ghost" data-cancel>Cancel</button></div>`;
+const map = makeMap(); des.querySelector('[data-map]').appendChild(map.box);
+CFX_TRIG.forEach(([n, v]) => { const o = document.createElement('option'); o.value = v; o.textContent = n; des.querySelector('#cfxTrig').appendChild(o); });
+CFX_MOVE.forEach(([n, v]) => { const o = document.createElement('option'); o.value = v; o.textContent = n; des.querySelector('#cfxMove').appendChild(o); });
+const PICKS = [['All', () => true], ['None', () => false], ['Swap', (i, s, m) => !m[i]], ['Bottom turn', (i, s) => s.turn === 0, 1], ['Lower', (i, s) => s.turn === 1, 1], ['Upper', (i, s) => s.turn === 2, 1], ['Top turn', (i, s) => s.turn === 3, 1],
+  ['Front half', (i, s) => Math.abs(s.x) < 0.25], ['Back half', (i, s) => Math.abs(s.x) >= 0.25], ['Left', (i, s) => s.x < 0], ['Right', (i, s) => s.x > 0]];
+PICKS.forEach(([n, f, add]) => {
+  const b = document.createElement('button'); b.className = 'small'; b.textContent = n;
+  b.addEventListener('click', () => {                                   // turns add to what's picked; the rest replace it
+    const m = cfxDraft.mask, s = map.spots;
+    for (let i = 0; i < ledCount; i++) m[i] = add ? (m[i] || f(i, s[i], m)) : f(i, s[i], m.slice());
+    cfxChanged();
+  });
+  des.querySelector('[data-picks]').appendChild(b);
+});
+CFX_SECS.forEach(([n, b]) => {
+  const btn = document.createElement('button'); btn.className = 'small'; btn.textContent = n; btn.dataset.b = b; btn.setAttribute('aria-pressed', 'false');
+  btn.addEventListener('click', () => { cfxDraft.secs ^= 1 << b; cfxChanged(); });
+  des.querySelector('[data-secs]').appendChild(btn);
+});
+// Designer sliders: same look and touch handling as the others, but they edit the draft (not a setting)
+function dslider(label, min, max, step, field, fmt, hint) {
+  const box = document.createElement('div'); box.className = 'ctl';
+  box.innerHTML = `<label>${label}</label><output></output><input type="range" min="${min}" max="${max}" step="${step}" aria-label="${label}">` + (hint ? `<div class="hint">${hint}</div>` : '');
+  const inp = box.querySelector('input'), out = box.querySelector('output'), lab = box.querySelector('label');
+  inp.addEventListener('input', () => { cfxDraft[field] = +inp.value; out.textContent = fmt(+inp.value); cfxChanged(true); });
+  return { box, render: () => { inp.value = cfxDraft[field]; out.textContent = fmt(cfxDraft[field]); }, setLabel: t => lab.textContent = t, inp };
+}
+const dEvery = dslider('Fire on every', 1, 16, 1, 'every', v => v == 1 ? 'every one' : v + (v == 2 ? 'nd' : v == 3 ? 'rd' : 'th') + ' one');
+const dSize = dslider('Size', 1, 30, 1, 'size', v => String(v));
+const dReps = dslider('Passes per run', 1, 8, 1, 'reps', v => v + '×', 'How many times the movement plays within one run.');
+const dLen = dslider('Run length', 1, 64, 1, 'len', v => cfxDraft.unit ? (v / 10).toFixed(1) + ' s' : (v / 4) + ' beats', 'Per preset, Speed scales this.');
+const dFade = dslider('Fade out', 0, 100, 5, 'fade', v => v + '% of the run', 'Unused for Always on (it fades in and out with its sections).');
+des.querySelector('[data-every]').appendChild(dEvery.box); des.querySelector('[data-size]').appendChild(dSize.box);
+des.querySelector('[data-reps]').appendChild(dReps.box); des.querySelector('[data-len]').appendChild(dLen.box); des.querySelector('[data-fade]').appendChild(dFade.box);
+des.querySelector('#cfxName').addEventListener('input', (e) => { cfxDraft.name = e.target.value; cfxChanged(true); });
+des.querySelector('#cfxTrig').addEventListener('change', (e) => { cfxDraft.trig = +e.target.value; cfxChanged(); });
+des.querySelector('#cfxMove').addEventListener('change', (e) => { cfxDraft.move = +e.target.value; cfxChanged(); });
+des.querySelectorAll('[data-unit] button').forEach(b => b.addEventListener('click', () => {
+  const u = +b.dataset.v; if (u === cfxDraft.unit) return;
+  const bpm = +$('stBpm').textContent || 120, sec = cfxDraft.unit ? cfxDraft.len / 10 : cfxDraft.len / 4 * 60 / bpm;   // keep about the same length
+  cfxDraft.unit = u; cfxDraft.len = Math.max(1, Math.min(u ? 100 : 64, Math.round(u ? sec * 10 : sec * bpm / 60 * 4)));
+  cfxChanged();
+}));
+des.querySelectorAll('[data-blend] button').forEach(b => b.addEventListener('click', () => { cfxDraft.blend = +b.dataset.v; cfxChanged(); }));
+des.querySelector('[data-save]').addEventListener('click', () => { send(fxdLine(cfxEditing, cfxDraft)); send('fxsave'); fxLib[cfxEditing] = cfxCopy(cfxDraft); cfxClose(true); toast('Design saved for every preset'); });
+des.querySelector('[data-cancel]').addEventListener('click', () => cfxClose(false));
+des.querySelector('[data-try2]').addEventListener('click', () => { send(fxdLine(cfxEditing, cfxDraft)); send('fxtest ' + cfxEditing); cfxPrev.start = performance.now(); });
+const cfxCopy = d => ({ ...d, mask: d.mask.slice() });
+function cfxRenderDesigner() {
+  const d = cfxDraft; if (!d) return;
+  if (document.activeElement !== des.querySelector('#cfxName')) des.querySelector('#cfxName').value = d.name;
+  des.querySelector('#cfxTrig').value = d.trig; des.querySelector('#cfxMove').value = d.move;
+  dEvery.box.hidden = d.trig === 13 || d.trig === 0;
+  des.querySelectorAll('[data-secs] button').forEach(b => b.setAttribute('aria-pressed', String(((d.secs >> +b.dataset.b) & 1) === 1)));
+  const mv = CFX_MOVE.find(x => x[1] === d.move); dSize.box.hidden = !mv[2]; if (mv[2]) dSize.setLabel(mv[2]);
+  dSize.inp.max = d.move === 9 || d.move === 10 ? 12 : 30; if (d.size > +dSize.inp.max) d.size = +dSize.inp.max;
+  dReps.box.hidden = [0, 6, 9, 10].includes(d.move);
+  dLen.inp.max = d.unit ? 100 : 64;
+  des.querySelectorAll('[data-unit] button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === d.unit)));
+  des.querySelectorAll('[data-blend] button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === d.blend)));
+  des.querySelector('[data-blenddesc]').textContent = CFX_BLEND[d.blend][2];
+  [dEvery, dSize, dReps, dLen, dFade].forEach(s => s.render());
+}
+function cfxChanged(noRender) {
+  if (cfxEditing < 0) return;
+  sendSoon(fxdLine(cfxEditing, cfxDraft), 'fxd' + cfxEditing);            // live on the orb (kept with Save design)
+  if (!noRender) cfxRenderDesigner();
+  cfxPrev.start = performance.now(); cfxPrev.tw = null; cfxPrev.dots = null;
+}
+const cfxPrev = { start: 0 };
+function cfxFrame(t) {
+  if (cfxEditing < 0) return;
+  const k = cfxEditing, d = cfxDraft, bpm = +$('stBpm').textContent || 120;
+  const dur = (d.unit ? d.len * 100 : d.len / 4 * 60000 / bpm) / Math.max(0.1, +(vals['cf' + k + 'speed'] ?? 1));
+  cfxPrev.dur = dur;
+  let p = (t - cfxPrev.start) / dur;
+  const loop = d.trig === 13 || d.trig === 6 || d.trig === 7 || d.trig === 8 || d.trig === 1;
+  if (p >= 1) { if (loop) { cfxPrev.start = t; p = 0; } else if (p > 1.6) { cfxPrev.start = t; p = 0; cfxPrev.tw = null; cfxPrev.dots = null; } }
+  let w = p < 1 ? fxWeights(d, p, map.spots, cfxPrev) : new Array(ledCount).fill(0);
+  const f = d.fade / 100, env = d.trig === 13 ? 1 : (f > 0.001 && p > 1 - f ? Math.max(0, (1 - p) / f) : 1);
+  if (p < 1) w = w.map(x => x * env);
+  const m = +(vals['col_cf' + k] ?? 0), hue = m === 2 ? vals['hue_cf' + k] ?? 0 : m === 1 ? currentHue + (vals['shift_cf' + k] ?? 0) : m === 3 ? currentHue + 128 : currentHue;
+  map.draw(w, d.blend === 2 ? '#000' : css(hue, m === 2 || m === 1 ? vals['sat_cf' + k] ?? 255 : 230));
+  cfxAnim = requestAnimationFrame(cfxFrame);
+}
+function cfxEdit(k) {
+  if (cfxEditing === k) { cfxClose(false); return; }
+  if (cfxEditing >= 0) cfxClose(false);
+  cfxEditing = k; cfxOrig = cfxCopy(fxLib[k]); cfxDraft = cfxCopy(fxLib[k]);
+  map.build(); map.design = cfxDraft; map.onChange = () => cfxChanged(true);
+  cfxCards[k].slot.appendChild(des); cfxRenderDesigner(); cfxRender();
+  cfxPrev.start = performance.now(); cancelAnimationFrame(cfxAnim); cfxAnim = requestAnimationFrame(cfxFrame);
+}
+function cfxClose(saved) {
+  const k = cfxEditing; if (k < 0) return;
+  clearTimeout(sendTimers['fxd' + k]);
+  if (!saved && cfxOrig && fxLib[k]) send(fxdLine(k, cfxOrig));        // cancel: the orb goes back to the kept design
+  cfxEditing = -1; cfxDraft = null; map.design = null; cancelAnimationFrame(cfxAnim); des.remove(); cfxRender();
+}
+const freeSlot = () => fxLib.findIndex(d => !d);
+$('cfxNew').addEventListener('click', () => {
+  const k = freeSlot(); if (k < 0) { toast('All 16 custom effects are used: delete one first'); return; }
+  const d = { trig: 7, secs: 0, move: 1, size: 4, reps: 1, every: 1, fade: 30, len: 16, unit: 0, blend: 0, mask: new Array(ledCount).fill(true), name: 'Effect ' + (k + 1) };
+  fxLib[k] = d; send(fxdLine(k, d)); send('fxsave');
+  Object.assign(vals, cfxDefaults(k)); vals['cf' + k + 'on'] = 1; send(`set cf${k}on 1`);
+  cfxRender(); renderAll(); cfxEdit(k);
+  cfxCards[k].card.classList.remove('collapsed');
+  cfxCards[k].card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+function cfxDuplicate(k) {
+  const j = freeSlot(); if (j < 0) { toast('All 16 custom effects are used: delete one first'); return; }
+  const d = cfxCopy(cfxEditing === k ? cfxDraft : fxLib[k]); d.name = cleanName(d.name.slice(0, 17) + ' 2');
+  fxLib[j] = d; send(fxdLine(j, d)); send('fxsave');
+  cfxKeys(k).forEach((key, n) => { const to = cfxKeys(j)[n]; vals[to] = vals[key] ?? cfxDefaults(k)[key]; send(`set ${to} ${vals[to]}`); });
+  cfxRender(); renderAll(); toast('Copied as ' + d.name);
+}
+
 // Gradient looks: one tap sets the colours, zones and balance
 const LOOKS = {
   'Blue + red face': { grad: 1, gradsrc: 1, gheat: 0.3, gh0: 158, gh1: 192, gh2: 99, gh3: 13, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1, gspin: 0, zones: 1, gbal: 1 },
@@ -824,23 +1172,41 @@ function lookCode() {
     if (DEVICE_KEYS.includes(k) || !(k in DEMO) || /^(set|rows|spots)/.test(k)) return;
     if (Math.abs(+vals[k] - +DEMO[k]) > 1e-6) parts.push(k + '=' + +(+vals[k]).toFixed(4));
   });
+  fxLib.forEach((d, k) => { if (d && vals['cf' + k + 'on'] == 1) parts.push(`fx${k}=` + fxCode(d)); });   // designs of the custom effects it uses
   parts.push('pal=' + pal.map(([p, h, sa]) => `${(+p).toFixed(3)}:${Math.round(h)}:${Math.round(sa)}`).join(','));
   return 'ORB1 ' + parts.join('; ');
 }
 function applyLookCode(text) {
   const t = text.trim().replace(/^ORB1\s*/i, ''); if (!t) { toast('Paste a code first'); return; }
-  const set = {}; let name = 'Imported look', palStops = null, bad = [];
+  let set = {}; let name = 'Imported look', palStops = null, bad = []; const designs = {};
   t.split(';').map(x => x.trim()).filter(Boolean).forEach(x => {
     const i = x.indexOf('='); if (i < 0) { bad.push(x); return; }
     const k = x.slice(0, i).trim(), v = x.slice(i + 1).trim();
     if (k === 'name') name = v;
+    else if (/^fx\d+$/.test(k)) { const d = fxFromCode(v); if (d) designs[+k.slice(2)] = d; else bad.push(k); }
     else if (k === 'pal') palStops = v.split(',').map(st => st.split(':').map(Number)).filter(a => a.length === 3 && a.every(n => !isNaN(n)));
     else if (k in DEMO && !DEVICE_KEYS.includes(k) && !isNaN(+v)) set[k] = +v;
     else bad.push(k);
   });
+  // Custom effects: reuse an identical design already on the orb, else add it to a free slot; settings follow it there
+  const slotMap = {}, full = [];
+  Object.entries(designs).forEach(([c, d]) => {
+    let j = fxLib.findIndex(x => sameDesign(x, d));
+    if (j < 0) { j = fxLib.findIndex(x => !x); if (j >= 0) { fxLib[j] = d; send(fxdLine(j, d)); send('fxsave'); } }
+    if (j < 0) full.push(d.name); else slotMap[c] = j;
+  });
+  const moved = {};
+  Object.entries(set).forEach(([k, v]) => {
+    const m = /^(cf)(\d+)(on|gain|speed)$/.exec(k) || /^(col_cf|hue_cf|sat_cf|shift_cf)(\d+)()$/.exec(k);
+    if (!m) { moved[k] = v; return; }
+    if (slotMap[m[2]] !== undefined) moved[m[1] + slotMap[m[2]] + m[3]] = v;   // (an effect the code has no design for is skipped)
+  });
+  set = moved;
+  if (full.length) bad.push('no room for ' + full.join(', '));
   quietSend = true; gettingAll = true; send('defaults nocal');
   Object.entries(set).forEach(([k, v]) => { vals[k] = v; send(`set ${k} ${v}`); });
   if (palStops && palStops.length >= 2) { pal = palStops; sendPalette(); }
+  cfxRender();
   pendingImport = { set, pal: palStops && palStops.length >= 2 ? palStops : null };   // the reset's reply would overwrite these in the app
   quietSend = false; dirty = true; updateSaveBtn(); renderAll();
   toast(name + (bad.length ? ` (skipped: ${bad.slice(0, 3).join(', ')})` : '') + ' - press Save to keep it');
@@ -1279,6 +1645,11 @@ function renderRows() {
 `;
     box.appendChild(r);
   }
+  const m = window.rowsMap; if (m) {                     // the map: front LEDs (selected turn blue, eye turn green)
+    m.build();
+    const front = {}; rows.r.slice(0, rows.n).forEach((v, k) => { front[Math.floor(v)] = k; front[Math.ceil(v)] = k; });
+    m.mark(i => front[i] === undefined ? '' : front[i] === rowSel ? '#3a8bff' : front[i] === rows.center ? '#33cc33' : '#dddddd');
+  }
 }
 function liveCol() { send(rowsLine()); send('tool column ' + rowSel); }
 $('rowsEd').addEventListener('change', (e) => {
@@ -1295,6 +1666,10 @@ $('rowsEd').addEventListener('click', (e) => {
   if (d) { const i = +d.dataset.rdel; rows.r.splice(i, 1); rows.n--; if (i < rows.center) rows.center--; rows.center = Math.max(0, Math.min(rows.center, rows.n - 1)); rowSel = -1; liveCol(); return; }
   if (row && !e.target.closest('input,label')) { rowSel = +row.dataset.rowsel; renderRows(); send('tool column ' + rowSel); }
 });
+window.rowsMap = makeMap(i => {                       // tap: that LED becomes the front of its turn
+  const r = window.rowsMap.spots[i].turn; rows.r[r] = i; rowSel = r; liveCol();
+});
+$('rowsMap').appendChild(window.rowsMap.box);
 function shiftAll(dv) { rows.r = rows.r.map((v, i) => i < rows.n ? Math.max(0, Math.min(ledCount - 1, v + dv)) : v); liveCol(); }
 $('shiftL').addEventListener('click', () => shiftAll(-1));
 // Test colours: darker picks = dimmer LEDs. Only for this test, not saved.
@@ -1384,6 +1759,7 @@ function onLine(line) {
     case 'rows': rows = { n: +w[1], center: +w[2], dir: +w[3], r: w.slice(4).map(Number) }; break;
     case 'spots': spots = w.slice(1).map(Number); break;
     case 'leds': ledCount = +w[1]; break;
+    case 'fxd': parseFxd(w, line); break;
     case 'end':
       gettingAll = false;
       if (pendingPal) { pal = PAL_PRESETS[pendingPal].map(s => [...s]); pendingPal = null; }   // the reset's reply carried the default palette
@@ -1392,7 +1768,7 @@ function onLine(line) {
         if (pendingImport.pal) { pal = pendingImport.pal.map(s => [...s]); sendPalette(); }
         pendingImport = null;
       }
-      renderAll(); break;
+      renderAll(); cfxRender(); break;
     case 'S': {
       const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
       $('stBpm').textContent = bpm; const se = $('stSec'); se.textContent = sec; se.className = 'sec-' + sec;
@@ -1424,7 +1800,7 @@ $('setPin').addEventListener('click', () => {
   if (p.length < 4 || p.length > 8 || /\s/.test(p)) { toast('Use 4 to 8 characters, no spaces'); return; }
   newPinPending = p; send('setpin ' + p); $('newPin').value = '';
 });
-function requestAll() { gettingAll = true; slotSeen = new Set(); installDone = false; send('get'); send('pinfo'); }
+function requestAll() { fxLib = Array(CFX_MAX).fill(null); gettingAll = true; slotSeen = new Set(); installDone = false; send('get'); send('pinfo'); }
 
 // ---------------- Bluetooth link (Nordic UART) ----------------
 const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -1555,15 +1931,17 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   col_spark: 0, hue_spark: 0, sat_spark: 255, shift_spark: 24, col_hat: 0, hue_hat: 24, sat_hat: 70, shift_hat: 0,
   col_roll: 0, hue_roll: 0, sat_roll: 120, shift_roll: 0, col_dancer: -1, hue_dancer: 0, sat_dancer: 0, shift_dancer: 0, dropsnap: 1,
   glitter: 0, glitmode: 0, glitspeed: 0.15, glitlen: 1, glitrise: 1, glitfrom: 0, glitgain: 3, glitclap: 0.5, col_glitter: 0, hue_glitter: 24, sat_glitter: 70, shift_glitter: 0 };
+for (let k = 0; k < CFX_MAX; k++) Object.assign(DEMO, cfxDefaults(k));   // custom effects' per-preset settings
 function startDemo() {
-  const st = { ...DEMO }, demoSlots = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
+  const st = { ...DEMO }, demoSlots = {}, demoFx = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
   const reply = (l) => setTimeout(() => onLine(l), 5);
   link = { send(line) {
     const w = line.trim().split(/\s+/);
     if (w[0] === 'get') {
       Object.entries(st).forEach(([k, v]) => reply(`v ${k} ${v}`));
       reply('pal 9 0 128 255 0.25 160 255 0.37 175 255 0.5 192 255 0.75 200 255 0.85 232 140 1 258 215 1.25 276 255 1.5 264 255');
-      reply('rows 4 2 1 12.5 28 43 57'); reply('spots 53 54 55 45 46 47 6 7 8 17 18 19'); reply('leds 59'); reply('end');
+      reply('rows 4 2 1 12.5 28 43 57'); reply('spots 53 54 55 45 46 47 6 7 8 17 18 19'); reply('leds 59');
+      Object.values(demoFx).forEach(l => reply(l)); reply('end');
     } else if (w[0] === 'set' && w[1] in st) { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); }
     else if (w[0] === 'defaults') { Object.assign(st, DEMO); link.send('get'); }
     else if (w[0] === 'pal') { const n = +w[1]; demoPal = []; for (let i = 0; i < n; i++) demoPal.push([+w[2 + 3 * i], +w[3 + 3 * i], +w[4 + 3 * i]]); }
@@ -1574,6 +1952,10 @@ function startDemo() {
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
     else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
     else if (w[0] === 'pall') { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); const n = Object.keys(demoSlots).length; for (const k in demoSlots) { const f = demoSlots[k].split('|'); f[7] = '0'; demoSlots[k] = f.join('|'); } reply(`ok pall ${w[1]} ${n}`); }
+    else if (w[0] === 'fxd') { demoFx[+w[1]] = line.trim(); reply('ok fxd ' + w[1]); reply(line.trim()); }
+    else if (w[0] === 'fxsave') reply('ok fxsave');
+    else if (w[0] === 'fxdel') { delete demoFx[+w[1]]; Object.assign(st, cfxDefaults(+w[1])); reply('ok fxdel ' + w[1]); reply(`fxd ${w[1]} -`); }
+    else if (w[0] === 'fxtest') reply('ok fxtest ' + w[1]);
     else if (w[0] === 'setpin') reply('pin changed');
     else if (w[0] === 'demo') reply('demo ' + (w[1] === '1' ? 'on (calm)' : 'off'));
   } };

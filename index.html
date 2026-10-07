@@ -398,18 +398,6 @@ select { width: auto; }
       <div class="btns"><button id="tTurns">Each turn in its own colour</button><button id="tCol">Front line</button><button id="tSpots">Effect spots</button><button id="tOff" class="ghost">Back to music</button></div>
     </div>
     <div class="card">
-      <h2>Eye shape test</h2>
-      <p class="muted small">A still eye at its resting spot on a plain glow. Try each shape from where people would stand. Darker colour picks = dimmer LEDs.</p>
-      <div class="btns" id="eyeShapes">
-        <button data-eshape="0">0 Eye alone</button><button data-eshape="1">1 Dark sides</button><button data-eshape="2">2 Dark all round</button><button data-eshape="3">3 Ring sides</button>
-        <button data-eshape="4">4 Ring all round</button><button data-eshape="5">5 Wide + ring</button><button data-eshape="6">6 Tall + ring</button><button data-eshape="7">7 Ring + dark outside</button></div>
-      <div class="btns">
-        <label class="small"><input type="color" data-ecol="0" value="#005a8c"> eye</label>
-        <label class="small"><input type="color" data-ecol="1" value="#8c1e00"> ring</label>
-        <label class="small"><input type="color" data-ecol="2" value="#280a00"> glow</label></div>
-      <div class="btns"><button id="eOff" class="ghost">Back to music</button></div>
-    </div>
-    <div class="card">
       <h2>PIN</h2>
       <p class="muted small">Anyone near the orb needs this to control it over Bluetooth. 4 to 8 characters.</p>
       <div class="numrow"><input type="password" id="newPin" autocomplete="off" aria-label="New PIN" style="width:140px"><button id="setPin">Change PIN</button></div>
@@ -636,7 +624,7 @@ function send(line) {
     }
     else if (m || /^pal /.test(line)) { dirty = true; updateSaveBtn(); }
   }
-  if (line === 'tool off' || /^tool (find|nb|turns|column|stop|sweep|eye|ecol)/.test(line)) { const b = document.getElementById('bgOn'); if (b) b.checked = false; }
+  if (line === 'tool off' || /^tool (find|nb|turns|column|stop|sweep)/.test(line)) { const b = document.getElementById('bgOn'); if (b) b.checked = false; }
   if (link) link.send(line);
 }
 
@@ -1346,14 +1334,6 @@ $('tTurns').addEventListener('click', () => send('tool turns'));
 $('tCol').addEventListener('click', () => send('tool column'));
 $('tSpots').addEventListener('click', () => send('tool spots'));
 $('tOff').addEventListener('click', () => send('tool off'));
-let eyeShape = 0;
-document.querySelectorAll('[data-eshape]').forEach(b => b.addEventListener('click', () => { eyeShape = +b.dataset.eshape; send('tool eye ' + eyeShape); }));
-document.querySelectorAll('[data-ecol]').forEach(inp => inp.addEventListener('input', () => {
-  const h = inp.value.replace('#', ''), r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  sendSoon(`tool ecol ${inp.dataset.ecol} ${r} ${g} ${b}`, 'ecol' + inp.dataset.ecol);
-  sendSoon('tool eye ' + eyeShape, 'ecolshow');
-}));
-$('eOff').addEventListener('click', () => send('tool off'));
 $('logSet').addEventListener('click', () => send($('logMode').value));
 $('logBurst').addEventListener('click', () => send('b'));
 $('factoryBox').addEventListener('click', (e) => {            // one listener, so it keeps working after re-drawing

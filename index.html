@@ -264,7 +264,7 @@ select { width: auto; }
     <div class="card">
       <div class="card-head"><div class="grow"><h2>Ideas to try</h2><p class="muted small">A library of looks and effects found while experimenting, to build presets from. Each starts from clean defaults (power and calibration kept), turns off every effect it isn't about, and sets its own colours and brightness. Tweak it, then keep it with Save to preset.</p></div></div>
       <details class="sub" id="subImport"><summary>Import or share a look</summary>
-        <p class="muted small">Copy the current look as a code to send to Claude, or paste a code to try it (like Try: clean start, nothing saved until you press Save).</p>
+        <p class="muted small">Copy the current look as a code, or paste a code to try it (nothing saved until you press Save).</p>
         <textarea id="lookCode" rows="4" spellcheck="false" placeholder="ORB1 name=...; grad=1; ..." style="width:100%;font:500 0.8rem var(--mono);background:var(--panel-2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
         <div class="btns"><button class="primary" id="lookImport">Try this code</button><button id="lookExport">Copy current look</button></div>
       </details>
@@ -1227,7 +1227,7 @@ function applyLookCode(text) {
 $('lookImport').addEventListener('click', () => applyLookCode($('lookCode').value));
 $('lookExport').addEventListener('click', async () => {
   const code = lookCode(); $('lookCode').value = code;
-  try { await navigator.clipboard.writeText(code); toast('Look copied - paste it to Claude'); } catch (e) { $('lookCode').select(); toast('Code is in the box - copy it from there'); }
+  try { await navigator.clipboard.writeText(code); toast('Look copied'); } catch (e) { $('lookCode').select(); toast('Code is in the box - copy it from there'); }
 });
 IDEAS.forEach(idea => {
   const row = document.createElement('div'); row.className = 'fx-row';

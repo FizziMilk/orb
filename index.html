@@ -497,13 +497,16 @@ const FX_CARDS = [
     S('eyebang', 'Brightness', 10, 150, 1),
     ] },
   { title: 'Clap sparks', sub: 'Top left and right, on the backbeat once the clap grid locks.', toggle: 'fx_claps', trig: 'clap', col: 'clap', autoDesc: "the glow colour's neighbour (accent)", items: [
-    S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }), ] },
+    S('clapgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
+    S('clapdb', 'Backbeat needed', 0.5, 8, 0.5, { fmt: v => v + ' dB', hint: 'Higher = claps only start on a clear backbeat and stop sooner in melodic parts. Default 3.' }), ] },
   { title: 'Hat sparks', sub: 'Bottom sides, on the off-beats once the hat grid locks.', toggle: 'fx_hats', trig: 'hat', col: 'hat', autoDesc: 'warm white', items: [
     S('hats', 'Sparks per side', 1, 3, 1), S('hatgain', 'Brightness', 1, 10, 0.5, { fmt: v => '×' + v }),
     ] },
-  { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [ ] },
+  { title: 'Snare-roll flutter', sub: 'Build-ups with a snare roll.', toggle: 'fx_roll', trig: 'roll', col: 'roll', autoDesc: 'a paler glow colour', items: [
+    S('roll', 'Strength', 0, 1.5, 0.05, { fmt: v => (+v).toFixed(2), hint: 'Default 0.3. Above 0.5 it can strobe hard in build-ups.' }), ] },
   { title: 'Drop sparkles', sub: 'Busy drums in drops.', toggle: 'fx_sparkles', trig: 'sparkle', col: 'spark', autoDesc: 'the glow colour, a little warmer and richer', items: [
-    S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }), ] },
+    S('sparkgain', 'Brightness', 1, 12, 0.5, { fmt: v => '×' + v }),
+    S('sparkbusy', 'Drums needed', 0.5, 3, 0.1, { fmt: v => (+v).toFixed(1) + ' hits per beat', hint: 'Lower = sparkles on calmer drums too. A plain backbeat is about 0.5. Default 1.2.' }), ] },
   { title: 'Glitter', sub: 'Small dots or lines that are always there, whatever the drums do: a mirror ball, or rising embers.', col: 'glitter', autoDesc: 'warm white', items: [
     S('glitter', 'Dots', 0, 16, 1, { fmt: v => +v ? String(+v) : 'Off' }),
     S('glitmode', 'Style', 0, 1, 1, { fmt: v => +v ? 'Embers: rise and burn out' : 'Mirror ball: drift round and twinkle' }),

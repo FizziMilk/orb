@@ -1833,6 +1833,7 @@ function onLine(line) {
       if (sumWait) { const c = sumWait.find(x => x.sum === w[1]); sumWait = null; if (c) { applyCache(c); toast('Loaded from this phone (nothing new on the orb)'); } else fullLoad(); }
       else if (sumSave) { sumSave = false; if (!gettingAll) saveCache(w[1]); }
       break;
+    case 'mtu': loadMtu = +w[1]; break;
     case 'loaded': case 'saved': break;
     case 'pin': if (w[1] === 'ok') { $('pinBox').hidden = true; savePin(pendingPin || loadPin()); pendingPin = null; if (bleDev) $('connState').textContent = 'Connected to ' + (bleDev.name || 'Orb'); startLoad(); }
                 else if (w[1] === 'wrong') showPin('That PIN is wrong. Try again.');
@@ -1858,10 +1859,10 @@ $('setPin').addEventListener('click', () => {
 });
 // Loading cover: shown from "PIN ok" until all settings ("end") and all 12 preset infos have arrived, so nothing
 // half-loaded can be changed. The bar counts setting lines against last time's count (stored per phone).
-let loadV = 0, loadOn = false, loadT = null;
+let loadV = 0, loadOn = false, loadT = null, loadT0 = 0, loadMtu = 0;
 function loadExpect() { try { return +localStorage.getItem('orbLoadV') || 300; } catch (e) { return 300; } }
 function showLoading() {
-  loadV = 0; loadOn = true; $('loadCover').hidden = false; $('loadTitle').textContent = "Loading the orb's settings"; loadStep();
+  loadV = 0; loadOn = true; loadT0 = performance.now(); loadMtu = 0; $('loadCover').hidden = false; $('loadTitle').textContent = "Loading the orb's settings"; loadStep();
   clearTimeout(loadT); loadT = setTimeout(() => { if (loadOn) { hideLoading(); toast('Some settings may not have arrived - tap Connect again if things look wrong'); } }, 30000);
 }
 function hideLoading() { loadOn = false; clearTimeout(loadT); $('loadCover').hidden = true; }
@@ -1871,9 +1872,10 @@ function loadStep() {
   const setDone = !gettingAll, f = installing ? 0.95 : (setDone ? 0.6 : 0.6 * Math.min(0.97, loadV / loadExpect())) + 0.4 * slotSeen.size / NSLOTS;
   $('loadBar').style.width = Math.round(f * 100) + '%';
   $('loadMsg').textContent = installing ? 'Putting the built-in presets on the orb…'
-    : `Settings ${setDone ? 'done' : loadV ? loadV + ' received' : 'waiting'} · presets ${slotSeen.size} of ${NSLOTS}`;
+    : `Settings ${setDone ? 'done' : loadV ? loadV + ' received' : 'waiting'} · presets ${slotSeen.size} of ${NSLOTS}` + (loadMtu ? ` · packets ${loadMtu > 23 ? Math.min(loadMtu - 3, 180) : 20} bytes` : '');
   if (setDone && slotSeen.size >= NSLOTS) {
     if (loadV > 50) try { localStorage.setItem('orbLoadV', loadV); } catch (e) {}
+    toast(`Loaded in ${((performance.now() - loadT0) / 1000).toFixed(1)} s` + (loadMtu ? ` (packets of ${loadMtu > 23 ? Math.min(loadMtu - 3, 180) : 20} bytes)` : ''));
     hideLoading(); if (!loadInstalled) { sumSave = true; send('sum'); }   // remember this download for the next connect
   }
 }

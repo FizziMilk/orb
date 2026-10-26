@@ -2010,8 +2010,8 @@ function releaseOrb(msg) {
 }
 document.addEventListener('visibilitychange', () => {
   clearTimeout(hideTimer);
-  if (document.hidden) {                                 // in the background for a minute: free the orb
-    hideTimer = setTimeout(() => { if (bleDev && bleDev.gatt.connected) { autoReleased = true; releaseOrb('Disconnected while in the background'); } }, 60000);
+  if (document.hidden) {                                 // in the background for 3 minutes: free the orb (short hops back
+    hideTimer = setTimeout(() => { if (bleDev && bleDev.gatt.connected) { autoReleased = true; releaseOrb('Disconnected while in the background'); } }, 180000);   //  into another app don't reload everything)
   } else if (autoReleased && bleDev) {                   // back again: reconnect quietly to the same orb
     autoReleased = false;
     connectBle(bleDev).catch(() => { toast('The orb is busy or out of range - tap Connect'); setConnected(false, 'Disconnected - tap Connect'); });

@@ -1503,7 +1503,7 @@ function maybeInstall() {
   if (installDone || slotSeen.size < NSLOTS) return;
   installDone = true;
   const empty = []; for (let k = 0; k < NSLOTS; k++) if (!slots[k]) empty.push(k);
-  if (empty.length) { loadInstalled = true; installBuiltins(empty); toast('Putting ' + empty.length + ' presets on the orb…'); }
+  if (empty.length) { loadInstalled = true; installBuiltins(empty); if (!loadOn) toast('Putting ' + empty.length + ' presets on the orb…'); }   // (first load: the loading card says it)
 }
 renderPresets();
 
@@ -1818,7 +1818,7 @@ function onLine(line) {
         pendingImport = null;
       }
       renderAll(); cfxRender();
-      if (!loadOn && link && !sumWait) { clearTimeout(sumTimer); sumTimer = setTimeout(() => { if (!gettingAll && link) { sumSave = true; send('sum'); } }, 400); }   // keep a copy of this state too
+      if (!loadOn && link && link.ble && !sumWait) { const l0 = link; clearTimeout(sumTimer); sumTimer = setTimeout(() => { if (!gettingAll && link === l0) { sumSave = true; send('sum'); } }, 400); }   // keep a copy of this state too
       loadStep(); break;
     case 'S': {
       const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
@@ -1831,7 +1831,7 @@ function onLine(line) {
     case 'sum':
       clearTimeout(sumTimer);
       if (sumWait) { const c = sumWait.find(x => x.sum === w[1]); sumWait = null; if (c) { applyCache(c); toast('Loaded from this phone (nothing new on the orb)'); } else fullLoad(); }
-      else if (sumSave) { sumSave = false; if (!gettingAll) saveCache(w[1]); }
+      else if (sumSave) { sumSave = false; if (!gettingAll && link && link.ble) saveCache(w[1]); }
       break;
     case 'mtu': loadMtu = +w[1]; break;
     case 'loaded': case 'saved': break;
@@ -1949,7 +1949,7 @@ async function connectBle(known) {                     // known: reconnect to th
     }
     busy = false;
   }
-  const my = { send(line) { q.push(line + '\n'); pump(); }, pause(ms) { q.push({ wait: ms }); pump(); } };
+  const my = { ble: true, send(line) { q.push(line + '\n'); pump(); }, pause(ms) { q.push({ wait: ms }); pump(); } };
   link = my;
   clearInterval(demoTimer); $('demoNote').hidden = true; $('offNote').hidden = true;
   dev.addEventListener('gattserverdisconnected', () => {
@@ -2045,8 +2045,10 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
 for (let k = 0; k < CFX_MAX; k++) Object.assign(DEMO, cfxDefaults(k));   // custom effects' per-preset settings
 function startDemo() {
   const st = { ...DEMO }, demoSlots = {}, demoFx = {}; let demoPal = PAL_PRESETS['Club Light'].map(x => [...x]);
-  const reply = (l) => setTimeout(() => onLine(l), 5);
-  link = { send(line) {
+  const slotLine = (k, name, desc, orig, v, pl) => `pi|${k}|1|${name}|${desc}|${v.mode} ${v.lamphue} ${v.lampsat}|${pl.length} ${pl.map(s => s.join(' ')).join(' ')}|${orig ? 1 : 0}|${['grad', 'gradsrc', 'gh0', 'gh1', 'gh2', 'gh3', 'gs0', 'gs1', 'gs2', 'gs3'].map(k => Math.round(v[k] ?? 0)).join(' ')}|${Array.from({ length: CFX_MAX }, (_, j) => v['cf' + j + 'on'] == 1 ? 2 ** j : 0).reduce((x, y) => x + y, 0).toString(16)}`;
+  BUILTIN_NAMES.forEach((n, k) => { if (k < NSLOTS) demoSlots[k] = slotLine(k, n, BUILTIN[n].desc, true, { ...DEMO, ...BUILTIN[n].set }, builtinPal(BUILTIN[n])); });   // (the demo starts with the built-ins, no install run)
+  const reply = (l) => setTimeout(() => { if (link === me) onLine(l); }, 5);   // (late demo replies after a real connect are dropped)
+  const me = link = { send(line) {
     const w = line.trim().split(/\s+/);
     if (w[0] === 'get') {
       Object.entries(st).forEach(([k, v]) => reply(`v ${k} ${v}`));
@@ -2058,10 +2060,14 @@ function startDemo() {
     else if (w[0] === 'pal') { const n = +w[1]; demoPal = []; for (let i = 0; i < n; i++) demoPal.push([+w[2 + 3 * i], +w[3 + 3 * i], +w[4 + 3 * i]]); }
     else if (w[0] === 'pinfo') { for (let k = 0; k < NSLOTS; k++) reply(demoSlots[k] || `pi|${k}|0`); reply('cur -1'); }
     else if (w[0] === 'psave') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|');
-      demoSlots[k] = `pi|${k}|1|${nd[0]}|${nd[1] || ''}|${st.mode} ${st.lamphue} ${st.lampsat}|${demoPal.length} ${demoPal.map(s => s.join(' ')).join(' ')}|${nd[2] === 'b' ? 1 : 0}|${['grad', 'gradsrc', 'gh0', 'gh1', 'gh2', 'gh3', 'gs0', 'gs1', 'gs2', 'gs3'].map(k => Math.round(st[k] ?? 0)).join(' ')}|${Array.from({ length: CFX_MAX }, (_, j) => st['cf' + j + 'on'] == 1 ? 2 ** j : 0).reduce((x, y) => x + y, 0).toString(16)}`; reply('ok psave ' + k); reply(demoSlots[k]); }
+      demoSlots[k] = slotLine(k, nd[0], nd[1] || '', nd[2] === 'b', st, demoPal); reply('ok psave ' + k); reply(demoSlots[k]); }
     else if (w[0] === 'pname') { const k = +w[1], nd = line.slice(line.indexOf(w[1]) + w[1].length + 1).split('|'); if (demoSlots[k]) { const f = demoSlots[k].split('|'); f[3] = nd[0]; f[4] = nd[1] || ''; f[7] = '0'; demoSlots[k] = f.join('|'); reply('ok pname ' + k); reply(demoSlots[k]); } }
     else if (w[0] === 'pclear') { delete demoSlots[+w[1]]; reply('ok pclear ' + w[1]); reply(`pi|${w[1]}|0`); }
-    else if (w[0] === 'pload') { reply('ok pload ' + w[1]); link.send('get'); }
+    else if (w[0] === 'pload') {                                    // built-in slots: their look (others: as they are)
+      const n = demoSlots[+w[1]] && demoSlots[+w[1]].split('|')[3];
+      if (BUILTIN[n] && demoSlots[+w[1]].split('|')[7] === '1') { Object.assign(st, DEMO, BUILTIN[n].set); demoPal = builtinPal(BUILTIN[n]).map(x => [...x]); }
+      reply('ok pload ' + w[1]); link.send('get'); reply('pal ' + demoPal.length + ' ' + demoPal.map(x => x.join(' ')).join(' ')); reply('end');
+    }
     else if (w[0] === 'pall') { st[w[1]] = +w[2]; reply(`v ${w[1]} ${st[w[1]]}`); const n = Object.keys(demoSlots).length; for (const k in demoSlots) { const f = demoSlots[k].split('|'); f[7] = '0'; demoSlots[k] = f.join('|'); } reply(`ok pall ${w[1]} ${n}`); }
     else if (w[0] === 'fxd') { demoFx[+w[1]] = line.trim(); reply('ok fxd ' + w[1]); reply(line.trim()); }
     else if (w[0] === 'fxsave') reply('ok fxsave');

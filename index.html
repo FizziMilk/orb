@@ -365,7 +365,8 @@ select { width: auto; }
       <h2>Remote</h2><p class="muted small">What each button on the Mr.Go remote does.</p>
       <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
       <svg id="remoteSvg" viewBox="-14 0 388 362" role="img" aria-label="Mr.Go remote button guide"></svg>
-      <p class="muted small">SMOOTH switches the colour buttons between presets and effects. In lamp mode, the brightness buttons change the lamp brightness. Blackout stays dark until the next kick.</p>
+      <p class="muted small">SMOOTH switches the colour buttons between presets and effects. In lamp mode, the brightness buttons change the lamp brightness. Blackout stays dark until the next kick. Dancer comes in on the next bar and stays until the kicks stop (press again to send him off).</p>
+      <div id="remoteMap" class="rows" hidden></div>
     </div>
     <div class="card">
       <div class="card-head"><div class="grow"><h2>LED finder</h2><p class="muted small">Lights one LED white. With neighbours on, it also shows where the orb thinks left, right, up and down are.</p></div></div>
@@ -633,7 +634,7 @@ function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toas
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 let activeSlot = -1, dirty = false, quietSend = false;   // the preset the orb is on, and unsaved changes to it
-const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats', 'headroom', 'levelrise', 'nodlead'];
+const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats', 'headroom', 'levelrise', 'nodlead', ...Array.from({ length: 12 }, (_, k) => 'remfx' + k)];
 let editAll = false;                                   // 'Edit all presets' mode
 function updateSaveBtn() {
   const b = $('btnSave'), s = activeSlot >= 0 ? slots[activeSlot] : null;
@@ -692,6 +693,7 @@ function toggle(key, label, desc, trig) {
 const controls = [], toggles = [];
 function renderAll() {
   controls.forEach(c => c.render());
+  if (window.remoteReady) renderRemote();
   if (window.cfxReady) cfxRender();
   toggles.forEach(t => t.cb.checked = vals[t.key] == 1);
   document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === +(vals.mode ?? 0))));
@@ -816,7 +818,7 @@ const CFX_TRIG = [
 const CFX_MOVE = [
   ['Still', 0, null], ['Spin round', 1, 'Width (LEDs)'], ['Rise (band)', 2, 'Band height (tenths of a turn)'], ['Fall (band)', 3, 'Band height (tenths of a turn)'],
   ['Spread from the front', 4, 'Ring width (LEDs)'], ['Chase along the strip', 5, 'Tail length (LEDs)'], ['Twinkle', 6, 'How busy'],
-  ['Flash on/off', 7, null], ['Breathe', 8, null], ['Falling dots (snow)', 9, 'Dots'], ['Rising dots', 10, 'Dots']];
+  ['Flash on/off', 7, null], ['Breathe', 8, null], ['Falling dots (snow)', 9, 'Dots'], ['Rising dots', 10, 'Dots'], ['Swing (back and forth)', 11, 'Width (LEDs)']];
 const CFX_SECS = [['Calm', 1], ['Build-up', 2], ['Groove', 3], ['Drop', 4]];
 const CFX_BLEND = [['Over', 0, 'Covers the glow with the effect colour.'], ['Add', 1, 'Adds light on top: brighter, colours mix.'], ['Darken', 2, 'Cuts dark shapes out of the glow (colour and brightness unused).']];
 const cfxKeys = k => ['cf' + k + 'on', 'col_cf' + k, 'hue_cf' + k, 'sat_cf' + k, 'shift_cf' + k, 'cf' + k + 'gain', 'cf' + k + 'speed'];
@@ -879,6 +881,7 @@ function fxWeights(d, p, spots, st) {
       case 6: { st.tw = st.tw || new Array(n).fill(0); if (Math.random() < sz / 100) st.tw[i] = 1; else st.tw[i] *= 0.82; w[i] = st.tw[i]; break; }
       case 7: w[i] = q < 0.5 ? 1 : 0; break;
       case 8: w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * q); break;
+      case 11: { let dx = spots[i].x * tl - 0.25 * tl * Math.sin(2 * Math.PI * q); dx = ((dx % tl) + 1.5 * tl) % tl - 0.5 * tl; w[i] = Math.max(0, 1 - Math.abs(dx) / sz); break; }   // swing
     }
   }
   if (d.move === 9 || d.move === 10) {                    // dots: a few cross the orb per run
@@ -1319,8 +1322,25 @@ function slotView(k) {
 // Remote guide: a drawing of the Mr.Go remote with a line from each button to what it does
 const REMOTE_FX = ['Spin', 'Ripple', 'Flood', 'Clap', 'Hats', 'Sparkles', 'Snare roll', 'Dancer', 'Party jump', 'Blackout', 'Palette sweep', 'Slingshot'];
 const REMOTE_COL = ['#f0482a', '#3fe0b0', '#1e78e0', '#ff6a1a', '#3cc8f0', '#1c1f4a', '#ff9a2a', '#2aa0a0', '#4a1c4a', '#ffe028', '#1e6a9a', '#a050b0'];
+const REM_DEFAULT = [0, 1, 2, 3, 4, 11, 6, 7, 8, 12, 13, 14];   // (firmware remFx: 12+K = custom effect K)
+const remAct = k => vals['remfx' + k] ?? REM_DEFAULT[k];
+const remName = k => { const a = remAct(k); return a >= 12 ? (fxLib[a - 12] ? fxLib[a - 12].name : REMOTE_FX[k]) : REMOTE_FX[a]; };
+function renderRemoteMap() {                         // effect mode: what each colour button fires (saved on the orb, all presets)
+  const box = $('remoteMap'); box.hidden = !remoteFx; if (!remoteFx) return;
+  const opts = REMOTE_FX.map((n, a) => [a, n]).concat(fxLib.map((d, k) => d ? [12 + k, 'Your effect: ' + d.name] : null).filter(Boolean));
+  const ROWN = ['Row 1', 'Row 2', 'Row 3', 'Row 4 (bottom)'], POS = ['left', 'middle', 'right'];
+  box.innerHTML = '<p class="small muted">Effect mode: pick what each colour button fires. Your own effects run once, with the current preset\'s colour and brightness for them, even if they are off in this preset.</p>'
+    + Array.from({ length: 12 }, (_, k) => `<div class="numrow"><label class="small" for="remfx${k}" style="min-width:150px">${ROWN[k / 3 | 0]}, ${POS[k % 3]}</label>`
+      + `<select id="remfx${k}" data-rem="${k}">${opts.map(([a, n]) => `<option value="${a}"${a === remAct(k) ? ' selected' : ''}>${esc(n)}</option>`).join('')}`
+      + (remAct(k) >= 12 && !fxLib[remAct(k) - 12] ? `<option value="${remAct(k)}" selected>${esc(REMOTE_FX[k])} (your effect ${remAct(k) - 11} is empty)</option>` : '') + '</select></div>').join('');
+}
+$('remoteMap').addEventListener('change', e => {
+  const k = e.target.dataset.rem; if (k === undefined) return;
+  vals['remfx' + k] = +e.target.value; send(`set remfx${k} ${+e.target.value}`); renderRemote();
+});
 let remoteFx = false;
 function renderRemote() {
+  renderRemoteMap();
   const svg = $('remoteSvg'); if (!svg) return;
   const CX = [132, 164, 196, 228], CY = [104, 144, 188, 232, 276, 320], R = 12, L = 98, RT = 262;
   const cut = t => t.length > 15 ? t.slice(0, 14) + '…' : t;
@@ -1348,7 +1368,7 @@ function renderRemote() {
   // every other row: column 1 left, column 2 left via the gap above, column 3 right via the gap, column 4 right
   const rows = [['Lamp red', 'Lamp green', 'Lamp blue', 'Lamp warm white']];
   for (let r = 0; r < 4; r++) {
-    const names = [0, 1, 2].map(c => { const k = r * 3 + c; return remoteFx ? REMOTE_FX[k] : slotView(k).name; });
+    const names = [0, 1, 2].map(c => { const k = r * 3 + c; return remoteFx ? remName(k) : slotView(k).name; });
     rows.push([...names, ['White flash', 'Strobe ½ bar', 'Sensitivity', 'Presets ↔ FX'][r]]);
   }
   rows.forEach((t, i) => {
@@ -1373,6 +1393,7 @@ document.querySelectorAll('#remoteSeg button').forEach(b => b.addEventListener('
   document.querySelectorAll('#remoteSeg button').forEach(x => x.setAttribute('aria-pressed', x === b));
   renderRemote();
 }));
+window.remoteReady = true;
 function renderPresets() {
   renderRemote();
   const box = $('builtinPresets'); box.innerHTML = '';

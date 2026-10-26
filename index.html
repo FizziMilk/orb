@@ -360,7 +360,7 @@ select { width: auto; }
   <section class="tab" id="tab-setup" role="tabpanel" hidden>
     <div class="card"><div class="card-head"><div class="grow"><h2>Demo song</h2><p class="muted small">The orb plays a made-up track into its own detection instead of the mic: calm, build-up, drop, groove, then a short silence, on a loop (about 2.5 minutes). For showing it off quietly or testing effects.</p></div>
       <label class="switch"><input type="checkbox" id="demoSong" aria-label="Demo song"><span></span></label></div><p class="small muted" id="demoSongState"></p></div>
-    <div class="card"><h2>Global</h2><p class="muted small">Light floor, dim-glow smoothing, tempo recovery, loudness adjustment, dancer timing and power are the same for every preset (so is Sensitivity on Home). Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
+    <div class="card"><h2>Global</h2><p class="muted small">Melody filter, tempo, light floor, dim-glow smoothing, tempo recovery, loudness adjustment, dancer timing and power are the same for every preset (so is Sensitivity on Home). Changes are saved on the orb automatically.</p><div class="rows" id="powerBox"></div></div>
     <div class="card">
       <h2>Remote</h2><p class="muted small">What each button on the Mr.Go remote does.</p>
       <div class="seg" id="remoteSeg" style="margin-top:10px"><button data-v="0" aria-pressed="true">Presets</button><button data-v="1" aria-pressed="false">Effects</button></div>
@@ -545,6 +545,8 @@ const FEEL_SING = [
   S('buildlift', 'Build-up lift', 0, 0.5, 0.01, { adv: true, fmt: pct }),
 ];
 const POWER = [                                        // global: the same for every preset, saved on the orb straight away
+  S('aafilter', 'Melody filter', 0, 1, 1, { fmt: v => v == 1 ? 'on' : 'off', hint: 'Cuts high sounds (cymbals, vocal overtones) before the melody analysis so they can\'t pass as notes. Off = the old behaviour, to compare.' }),
+  S('tempofit', 'Steadier tempo', 0, 1, 1, { fmt: v => v == 1 ? 'on' : 'off', hint: 'Works out the tempo from the last 8 kicks instead of one gap at a time: follows tempo changes faster, wobbles less. Off = the old behaviour, to compare.' }),
   S('relbeats', 'Recovery follows the tempo', 0, 1, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '% of a beat', hint: 'How fast the bass pulse recovers, as a share of each beat, so fast and slow songs both feel right. 30% = about 110 ms at 160 BPM, 165 ms at 110 BPM. Off = each preset uses its own Recovery.' }),
   S('levelrise', 'Louder music: adjust over', 1000, 20000, 500, { fmt: v => (v / 1000).toFixed(1) + ' s', hint: 'When the music gets louder, the orb takes this long to treat it as the new normal. Longer = drops stay at full brightness for longer. Was 2.5 s before 6 Oct.' }),
   S('nodlead', 'Dancer timing', 0, 2, 0.05, { fmt: v => v == 0 ? 'off' : Math.round(v * 100) + '%', hint: 'The dancer starts each nod early so it lands on the beat. 100% = the calculated amount; lower if it looks early, higher if it still looks late.' }),
@@ -634,7 +636,7 @@ function toast(msg) { $('undoToast').classList.remove('show'); const t = $('toas
 const sendTimers = {};
 function sendSoon(line, key) { clearTimeout(sendTimers[key]); sendTimers[key] = setTimeout(() => send(line), 70); }
 let activeSlot = -1, dirty = false, quietSend = false;   // the preset the orb is on, and unsaved changes to it
-const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats', 'headroom', 'levelrise', 'nodlead', ...Array.from({ length: 12 }, (_, k) => 'remfx' + k)];
+const DEVICE_KEYS = ['ledma', 'fxshare', 'floor', 'sparse', 'relbeats', 'headroom', 'levelrise', 'nodlead', 'aafilter', 'tempofit', ...Array.from({ length: 12 }, (_, k) => 'remfx' + k)];
 let editAll = false;                                   // 'Edit all presets' mode
 function updateSaveBtn() {
   const b = $('btnSave'), s = activeSlot >= 0 ? slots[activeSlot] : null;
@@ -2035,7 +2037,7 @@ const DEMO = { bright: 255, headroom: 6, mode: 0, lamphue: 20, lampsat: 200, lam
   clapgain: 4.5, clapdb: 3, hats: 1, hatgain: 4, hatdb: 2, roll: 0.3, sparkgain: 6, sparkbusy: 1.2, spinbeats: 2, spinturns: 1, spingain: 8, spindim: 0.8,
   ripplegain: 4, sling: 0.3, dipdepth: 0.6, diprelease: 80, singmin: 0.15, singceil: 0.6, singdrift: 0.05, floor: 0, buildlift: 0.15, kickdb: 6,
   sparse: 3, fxshare: 0.27, ledma: 480,
-  relbeats: 0.3, levelrise: 8000, nodlead: 1, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
+  relbeats: 0.3, levelrise: 8000, nodlead: 1, aafilter: 1, tempofit: 1, depthslow: 0, zscale: 1, gscheme: 1, gbal: 0, gspin: 0, gheat: 0, pump: 0, bassh: 0, volfill: 0, zones: 0, zc0: 0.4, zc1: 0.22, zc2: 0.15, zc3: 0.15, grad: 0, gradsrc: 0, gradspread: 0.5, gh0: 160, gh1: 192, gh2: 232, gh3: 12, gs0: 255, gs1: 255, gs2: 255, gs3: 255, gb0: 1, gb1: 1, gb2: 1, gb3: 1,
   gdrive: 0, revrange: 12, revmin: 0.25, revrel: 250, bandmin: 0.2, gbuild: 1, lampgrad: 0, lamphue2: 200, lampsat2: 200,
   col_eye: 0, hue_eye: 0, sat_eye: 0, shift_eye: 0, col_clap: 0, hue_clap: 0, sat_clap: 255, shift_clap: 36,
   col_spin: 0, hue_spin: 0, sat_spin: 200, shift_spin: 36, col_ripple: 0, hue_ripple: 0, sat_ripple: 255, shift_ripple: 0,

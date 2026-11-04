@@ -230,7 +230,7 @@ section.tab{gap:0}
 .preset,.stop{background:transparent;border-color:#333}
 body{font-size:14px}
 .ctl label,h3,details.sub > summary{font-weight:500;letter-spacing:0}
-.muted.small,.hint{font:400 .8rem/1.4 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;letter-spacing:0}   /* descriptions: small, legible */
+.muted.small,.hint,.ctl .hint,.banner p.small{font:400 .75rem/1.4 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;letter-spacing:0}   /* descriptions: small, legible */
 .ctl output{font-size:.8rem}
 button.small{font-size:.72rem;padding:6px 8px}
 .card-head .numrow{flex-wrap:nowrap}
@@ -263,6 +263,14 @@ details.sub > summary .muted{letter-spacing:.08em}
 .dv-chips span.on{background:var(--accent);border-color:var(--accent);color:#06202e}
 .dv-chips span.soft{border-color:var(--accent);color:var(--fg)}
 #remoteSvg .lbl{font:500 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+/* setting names: same style as the tabs */
+h3, .ctl > label{font:500 .74rem/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em}
+h3 .muted, .ctl > label .muted{text-transform:none;letter-spacing:normal}
+.banner p.small b{font:500 .74rem/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-right:4px}
+/* status rows line up with the tabs: left column flush left, middle centred, right column flush right */
+.live .chip:nth-child(3n+2){justify-content:center !important}
+.live .chip:nth-child(3n){justify-content:flex-end !important}
+.live .chip .heat{flex:none;width:64px}
 button.play{flex:none;width:34px;height:28px;padding:0;font-size:.7rem;line-height:1}
 .pearl-opts{display:flex;gap:6px;flex:none}
 </style>
@@ -285,9 +293,9 @@ button.play{flex:none;width:34px;height:28px;padding:0;font-size:.7rem;line-heig
   </div>
   <div class="allbar" id="allBar" hidden><span class="grow small"><b>Editing all presets:</b> slider changes go to every preset.</span><button class="small" id="allDone">Done</button></div>
   <div class="live" aria-live="polite">
-    <span class="chip"><b id="stBpm">–</b> BPM</span>
-    <span class="chip">section: <b id="stSec" class="sec-silent">–</b></span>
-    <span class="chip">heat: <span class="heat"><i id="stHeat"></i></span></span>
+    <span class="chip"><span id="stBpmLbl">bpm</span>&nbsp;<b id="stBpm">–</b></span>
+    <span class="chip">section&nbsp;<b id="stSec" class="sec-silent">–</b></span>
+    <span class="chip">heat&nbsp;<span class="heat"><i id="stHeat"></i></span></span>
     <span class="chip" id="stStage">dancer</span>
     <span class="chip" id="stClap">clap grid</span>
     <span class="chip" id="stHat">hat grid</span>
@@ -638,15 +646,15 @@ const POWER = [                                        // global: the same for e
 
 const PAL_PRESETS = {
   'Club Light': [[0, 128, 255], [0.25, 160, 255], [0.37, 175, 255], [0.5, 192, 255], [0.75, 200, 255], [0.85, 232, 140], [1, 258, 215], [1.25, 276, 255], [1.5, 264, 255]],
-  'Sunset': [[0, 200, 255], [0.4, 225, 230], [0.8, 245, 255], [1.1, 262, 255], [1.4, 276, 255]],
-  'Ember': [[0, 248, 255], [0.4, 260, 255], [0.8, 274, 255], [1.1, 284, 240], [1.4, 294, 215]],
+  'Sunset Drive': [[0, 200, 255], [0.4, 225, 230], [0.8, 245, 255], [1.1, 262, 255], [1.4, 276, 255]],
+  'Ember': [[0, 27, 255], [0.4, 18, 255], [0.8, 14, 255], [1.1, 9, 240], [1.4, 0, 215]],
   'Neon': [[0, 196, 255], [0.35, 212, 255], [0.7, 226, 255], [1.05, 238, 255], [1.15, 340, 255], [1.5, 352, 255]],
   'Deep Sea': [[0, 166, 255], [0.45, 124, 255], [0.85, 136, 230], [1.2, 145, 150], [1.5, 150, 90]],
   'Aurora': [[0, 100, 255], [0.4, 114, 240], [0.8, 134, 230], [1.1, 178, 220], [1.4, 204, 255]],
   'Warehouse': [[0, 160, 90], [0.5, 150, 55], [1.0, 140, 25], [1.4, 276, 45]],
   'Bubblegum': [[0, 128, 150], [0.5, 146, 120], [0.9, 222, 140], [1.3, 238, 170]],
   'Velvet': [[0, 172, 255], [0.45, 188, 255], [0.9, 202, 240], [1.3, 218, 255]],
-  'Disco': [[0, 24, 255], [0.5, 34, 230], [1.0, 40, 170], [1.4, 36, 70]],
+  'Disco': [[0, 16, 255], [0.5, 18, 255], [1.0, 19, 250]],
   'Acid': [[0, 62, 255], [0.5, 74, 255], [1.0, 86, 255], [1.4, 98, 255]],
 };
 const fxOn = (off = []) => Object.fromEntries(FX.map(f => [f[0], off.includes(f[0]) ? 0 : 1]));
@@ -665,7 +673,7 @@ const BUILTIN = {
       col_spark: 1, shift_spark: 128, col_spin: 1, shift_spin: 128, sat_spin: 230 },
     pal: 'Neon', desc: 'Loud: violet and pink, acid green at the peak.' },
   'Sunset Drive': { set: { mode: 0, ...fxOn(), coloursmooth: 0.0018, sling: 0.5, spinbeats: 4, spinturns: 1, spindim: 0.5, idlehue: 200 },
-    pal: 'Sunset', desc: 'Purple dusk to orange, long lazy spins.' },
+    pal: 'Sunset Drive', desc: 'Purple dusk to orange, long lazy spins.' },
   'Warehouse': { set: { mode: 0, ...fxOn(['fx_party']), dipdepth: 0.95, diprelease: 40, warmth: 0.3, moodscale: 0.4, hats: 2,
       spinbeats: 1, spinturns: 2, spingain: 10, spindim: 1, idlehue: 150,
       col_eye: 2, hue_eye: 0, sat_eye: 255, col_clap: 2, sat_clap: 0, col_spark: 2, sat_spark: 0, col_hat: 2, sat_hat: 0, col_spin: 2, sat_spin: 0 },
@@ -2004,7 +2012,7 @@ function onLine(line) {
       loadStep(); break; }
     case 'S': {
       const [, bpm, sec, heat, stage, clap, hat, mode, hue] = w;
-      $('stBpm').textContent = bpm; const se = $('stSec'); se.textContent = sec; se.className = 'sec-' + sec;
+      const lamp = mode === '1'; $('stBpmLbl').textContent = lamp ? 'mode' : 'bpm'; $('stBpm').textContent = lamp ? 'lamp' : bpm; const se = $('stSec'); se.textContent = sec; se.className = 'sec-' + sec;
       $('stHeat').style.width = Math.min(100, +heat * 100) + '%';
       $('stStage').classList.toggle('on', stage === '1'); $('stClap').classList.toggle('on', clap === '1'); $('stHat').classList.toggle('on', hat === '1');
       updateOrbDot(mode === '1' ? (vals.lamphue ?? 20) : +hue);
